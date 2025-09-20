@@ -53,52 +53,111 @@ router.post("/get-registered-courses", async (req, res) => {
 });
 
 
-router.post("/get-upcoming-classes", async (req, res) => {
-    try {
-        const { authorization } = req.body;
+// router.post("/get-upcoming-classes", async (req, res) => {
+//     try {
+//         const { authorization } = req.headers;
 
+//         if (!authorization) {
+//             return res.status(400).json({
+//                 success: false,
+//                 error: "Authorization token zaroori hai",
+//             });
+//         }
+        
+//         console.log("[INFO] Upcoming classes ka data fetch kiya ja raha hai...");
+
+//         // Aapke dwara diya gaya naya URL
+//         const upcomingClassesUrl = "https://kiet.cybervidya.net/api/student/dashboard/upcoming/classes";
+
+//         const classesResponse = await gotScraping({
+//             url: upcomingClassesUrl,
+//             method: 'GET',
+//             headers: {
+//                 'Authorization': authorization, // Auth token header mein bhejein
+//             },
+//             responseType: 'json',
+//             throwHttpErrors: false,
+//         });
+        
+//         const responseBody = classesResponse.body;
+
+//         if (classesResponse.statusCode !== 200) {
+//             const errorMessage = responseBody?.message || "Upcoming classes fetch nahi ho saki. Token invalid ya expire ho sakta hai.";
+//             console.error(`[ERROR] Upcoming classes fetch karne mein galti: ${errorMessage}`);
+//             return res.status(classesResponse.statusCode).json({ success: false, error: errorMessage });
+//         }
+        
+//         console.log("[SUCCESS] Upcoming classes safaltapoorvak fetch ho gayi.");
+        
+//         // CyberVidya se mila poora data frontend ko bhej dein
+//         res.json({
+//             success: true,
+//             data: responseBody,
+//         });
+
+//     } catch (error) {
+//         const errorMessage = error.message || "Upcoming classes fetch karne ke dauraan ek anjaan error aayi.";
+//         console.error("❌ ERROR /get-upcoming-classes mein:", errorMessage);
+//         res.status(500).json({ success: false, error: errorMessage });
+//     }
+// });
+
+// Backend route file (e.g., server.js ya apiRoutes.js)
+
+// Helper function to get dates in YYYY-MM-DD format (yeh same rahega)
+const getFormattedDate = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+// Puraane "/get-weekly-schedule" route ko isse replace karein
+router.post("/get-weekly-schedule", async (req, res) => {
+    try {
+        const { authorization } = req.headers;
         if (!authorization) {
-            return res.status(400).json({
-                success: false,
-                error: "Authorization token zaroori hai",
-            });
+            return res.status(400).json({ success: false, error: "Authorization token zaroori hai" });
         }
         
-        console.log("[INFO] Upcoming classes ka data fetch kiya ja raha hai...");
+        console.log("[INFO] Agle 7 din ka schedule fetch kiya ja raha hai...");
 
-        // Aapke dwara diya gaya naya URL
-        const upcomingClassesUrl = "https://kiet.cybervidya.net/api/student/dashboard/upcoming/classes";
+        // ✅ NAYA LOGIC: Aaj se agle 6 din ki date nikaalein
+        const startDateObj = new Date();
+        const endDateObj = new Date();
+        endDateObj.setDate(startDateObj.getDate() + 6); // Aaj + 6 din
 
-        const classesResponse = await gotScraping({
-            url: upcomingClassesUrl,
+        const weekStartDate = getFormattedDate(startDateObj);
+        const weekEndDate = getFormattedDate(endDateObj);
+
+        console.log(`[DATE] Fetching data for: ${weekStartDate} to ${weekEndDate}`);
+        
+        const scheduleUrl = `https://kiet.cybervidya.net/api/student/schedule/class?weekEndDate=${weekEndDate}&weekStartDate=${weekStartDate}`;
+
+        const scheduleResponse = await gotScraping({
+            url: scheduleUrl,
             method: 'GET',
-            headers: {
-                'Authorization': authorization, // Auth token header mein bhejein
-            },
+            headers: { 'Authorization': authorization },
             responseType: 'json',
             throwHttpErrors: false,
         });
         
-        const responseBody = classesResponse.body;
+        const responseBody = scheduleResponse.body;
 
-        if (classesResponse.statusCode !== 200) {
-            const errorMessage = responseBody?.message || "Upcoming classes fetch nahi ho saki. Token invalid ya expire ho sakta hai.";
-            console.error(`[ERROR] Upcoming classes fetch karne mein galti: ${errorMessage}`);
-            return res.status(classesResponse.statusCode).json({ success: false, error: errorMessage });
+        if (scheduleResponse.statusCode !== 200) {
+            throw new Error(responseBody?.message || "Weekly schedule fetch nahi ho saka.");
         }
         
-        console.log("[SUCCESS] Upcoming classes safaltapoorvak fetch ho gayi.");
+        console.log("[SUCCESS] Weekly schedule safaltapoorvak fetch ho gaya.");
         
-        // CyberVidya se mila poora data frontend ko bhej dein
         res.json({
             success: true,
             data: responseBody,
         });
 
     } catch (error) {
-        const errorMessage = error.message || "Upcoming classes fetch karne ke dauraan ek anjaan error aayi.";
-        console.error("❌ ERROR /get-upcoming-classes mein:", errorMessage);
-        res.status(500).json({ success: false, error: errorMessage });
+        console.error("❌ ERROR /get-weekly-schedule mein:", error.message);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
@@ -151,48 +210,27 @@ router.post("/get-dashboard-attendance", async (req, res) => {
 
 router.post("/get-detailed-attendance", async (req, res) => {
     try {
-        const { authorization } = req.body;
-
+        const { authorization } = req.headers; // <-- BODY SE HEADERS KIYA GAYA
         if (!authorization) {
-            return res.status(400).json({
-                success: false,
-                error: "Authorization token zaroori hai",
-            });
+            return res.status(400).json({ success: false, error: "Authorization header zaroori hai" });
         }
-        
         console.log("[INFO] Detailed attendance data fetch kiya ja raha hai...");
-
         const attendanceUrl = "https://kiet.cybervidya.net/api/attendance/course/component/student";
-
         const attendanceResponse = await gotScraping({
             url: attendanceUrl,
             method: 'GET',
-            headers: {
-                'Authorization': authorization,
-            },
+            headers: { 'Authorization': authorization },
             responseType: 'json',
             throwHttpErrors: false,
         });
-        
         const responseBody = attendanceResponse.body;
-
         if (attendanceResponse.statusCode !== 200) {
-            const errorMessage = responseBody?.message || "Detailed attendance fetch nahi ho saki. Token invalid ya expire ho sakta hai.";
-            console.error(`[ERROR] Detailed attendance fetch karne mein galti: ${errorMessage}`);
-            return res.status(attendanceResponse.statusCode).json({ success: false, error: errorMessage });
+            throw new Error(responseBody?.message || "Detailed attendance fetch nahi ho saki.");
         }
-        
         console.log("[SUCCESS] Detailed attendance data safaltapoorvak fetch ho gaya.");
-        
-        res.json({
-            success: true,
-            data: responseBody,
-        });
-
+        res.json({ success: true, data: responseBody });
     } catch (error) {
-        const errorMessage = error.message || "Detailed attendance fetch karne ke dauraan ek anjaan error aayi.";
-        console.error("❌ ERROR /get-detailed-attendance mein:", errorMessage);
-        res.status(500).json({ success: false, error: errorMessage });
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 

@@ -22,8 +22,7 @@ router.post("/get-session", async (req, res) => {
     const loginResponse = await gotScraping({
       url: loginUrl,
       method: "POST",
-      // ✅ FIX: Data ko 'form' ke bajaye 'json' format mein bhej rahe hain
-      // Isse Content-Type apne aap application/json set ho jayega
+      // ✅ FIX: Data ko dobara 'json' format mein bhej rahe hain, jaisa Postman mein hai
       json: {
         userName: username,
         password: password,
@@ -58,52 +57,7 @@ router.post("/get-session", async (req, res) => {
 });
 
 // NAYA Route: '/get-attendance' - Token ka istemal karke attendance data fetch karne ke liye
-router.post("/get-attendance", async (req, res) => {
-    try {
-        const { authorization } = req.body;
 
-        if (!authorization) {
-            return res.status(400).json({
-                success: false,
-                error: "Authorization token zaroori hai",
-            });
-        }
-        
-        console.log("[INFO] Attendance data fetch kiya ja raha hai...");
-
-        const attendanceUrl = "https://kiet.cybervidya.net/api/attendance/course/component/student";
-
-        const attendanceResponse = await gotScraping({
-            url: attendanceUrl,
-            method: 'GET',
-            headers: {
-                'Authorization': authorization, // Poora header yahan istemal karein
-            },
-            responseType: 'json',
-            throwHttpErrors: false,
-        });
-        
-        const responseBody = attendanceResponse.body;
-
-        if (attendanceResponse.statusCode !== 200) {
-            const errorMessage = responseBody?.message || "Attendance fetch nahi ho saki. Token invalid ya expire ho sakta hai.";
-            console.error(`[ERROR] Attendance fetch karne mein galti: ${errorMessage}`);
-            return res.status(attendanceResponse.statusCode).json({ success: false, error: errorMessage });
-        }
-        
-        console.log("[SUCCESS] Attendance data safaltapoorvak fetch ho gaya.");
-        
-        res.json({
-            success: true,
-            data: responseBody,
-        });
-
-    } catch (error) {
-        const errorMessage = error.message || "Attendance fetch karne ke dauraan ek anjaan error aayi.";
-        console.error("❌ ERROR /get-attendance mein:", errorMessage);
-        res.status(500).json({ success: false, error: errorMessage });
-    }
-});
 
 
 // Default route
