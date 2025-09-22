@@ -11,18 +11,17 @@ router.post("/get-session", async (req, res) => {
     if (!username || !password) {
       return res.status(400).json({
         success: false,
-        error: "Username aur password zaroori hai",
+        error: "Username and password are required",
       });
     }
 
-    console.log(`[INFO] '${username}' ke liye login request kiya ja raha hai...`);
+    console.log(`[INFO] Login request for '${username}'...`);
 
     const loginUrl = "https://kiet.cybervidya.net/api/auth/login";
 
     const loginResponse = await gotScraping({
       url: loginUrl,
       method: "POST",
-      // ✅ FIX: Data ko dobara 'json' format mein bhej rahe hain, jaisa Postman mein hai
       json: {
         userName: username,
         password: password,
@@ -32,26 +31,36 @@ router.post("/get-session", async (req, res) => {
     });
     
     const responseBody = loginResponse.body;
-
     const token = responseBody?.data?.token;
 
-    if (loginResponse.statusCode !== 200 || !token) {
-        const errorMessage = responseBody?.message || "Login fail hua. Credentials galat ho sakte hain.";
-        console.error(`[ERROR] '${username}' ke liye login fail hua: ${errorMessage}`);
-        return res.status(loginResponse.statusCode || 401).json({ success: false, error: errorMessage });
+    if (loginResponse.statusCode === 200 && token) {
+      const authorizationHeader = `GlobalEducation ${token}`;
+      console.log(`[SUCCESS] Auth token received for '${username}'.`);
+      res.json({
+        success: true,
+        authorization: authorizationHeader, 
+      });
+    } else {
+      // ✅ FIX: Special check for account lockout warnings
+      let errorMessage;
+      const cyberVidyaMessage = responseBody?.message || ""; // Get the message safely
+
+      if (cyberVidyaMessage.toLowerCase().includes('attempt left')) {
+        // If the message contains "attempt left", use that exact message
+        errorMessage = cyberVidyaMessage;
+      } else {
+        // Otherwise, use a standard error message
+        errorMessage = "Login failed. Please check your credentials.";
+      }
+      
+      console.error(`[ERROR] Login failed for '${username}': ${cyberVidyaMessage}`);
+      
+      return res.status(loginResponse.statusCode || 401).json({ success: false, error: errorMessage });
     }
 
-    const authorizationHeader = `GlobalEducation ${token}`;
-    console.log(`[SUCCESS] '${username}' ke liye Auth token safaltapoorvak mil gaya.`);
-
-    res.json({
-      success: true,
-      authorization: authorizationHeader, 
-    });
-
   } catch (error) {
-    const errorMessage = error.message || "Login ke dauraan ek anjaan error aayi.";
-    console.error("❌ ERROR /get-session mein:", errorMessage);
+    const errorMessage = error.message || "An unknown error occurred during login.";
+    console.error("❌ CRITICAL ERROR in /get-session:", errorMessage);
     res.status(500).json({ success: false, error: errorMessage });
   }
 });

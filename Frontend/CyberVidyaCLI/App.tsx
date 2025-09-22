@@ -9,9 +9,9 @@ import { createStackNavigator } from '@react-navigation/stack';
 
 import LoginPage from './Screen/Login';
 import HomeScreen from './Screen/Home';
-import ProfileScreen from './Screen/profilescreen'; // Corrected filename casing
+import ProfileScreen from './Screen/profilescreen'; 
 import TimetableScreen from './Screen/Timetable';
-import CourseDetailsScreen from './Screen/CourseDetailsScreen'; // ✅ Import the new screen
+import CourseDetailsScreen from './Screen/CourseDetailsScreen'; 
 import { logout } from './api';
 import Icon from 'react-native-vector-icons/Ionicons';
 
@@ -49,7 +49,7 @@ function MainAppTabs({ onLogout }: { onLogout: () => void }) {
         children={() => <HomeScreen onLogout={onLogout} />}
       />
       <Tab.Screen name="Timetable" component={TimetableScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="About us" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }

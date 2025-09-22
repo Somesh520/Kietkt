@@ -3,7 +3,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { InternalAxiosRequestConfig, AxiosHeaderValue } from 'axios'; // AxiosHeaderValue import karein
 
-const API_BASE_URL = "http://10.0.2.2:3000/api";
+const API_BASE_URL = "https://kietkt.onrender.com/api";
 const AUTH_TOKEN_KEY = 'authToken';
 const USER_CREDENTIALS_KEY = 'userCredentials';
 
@@ -134,9 +134,11 @@ export const login = async (username: string, password: string) => {
     throw new Error(data.error || 'Login failed');
 };
 
+// api.ts mein is function ko update karein
+
 export const logout = async () => {
-    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, USER_CREDENTIALS_KEY]);
-    // ✅ Yahan badlav kiya gaya hai (Line 94)
+    // ✅ FIX: Ab yeh sirf token delete karega, credentials nahi.
+    await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
     delete apiClient.defaults.headers['Authorization'];
 };
 

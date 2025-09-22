@@ -1,18 +1,18 @@
-// Screen/TimetableScreen.tsx (FINAL CLEAN CODE)
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ActivityIndicator,
   SectionList,
   SafeAreaView,
+  Animated,
+  ScrollView,
 } from 'react-native';
 import { getWeeklySchedule, TimetableEvent } from '../api';
+import Icon from 'react-native-vector-icons/Ionicons';
+import LinearGradient from 'react-native-linear-gradient';
 
 // --- Helper Functions ---
-
 const getTodayDateKey = (): string => {
   const today = new Date();
   const day = String(today.getDate()).padStart(2, '0');
@@ -46,23 +46,73 @@ const formatSectionHeaderDate = (dateString: string): string => {
   });
 };
 
-// --- Card Components ---
 
+// --- Skeleton Loader Components ---
+const Shimmer = () => {
+  const shimmerValue = useRef(new Animated.Value(-1)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(shimmerValue, {
+        toValue: 1,
+        duration: 1200,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, [shimmerValue]);
+
+  const translateX = shimmerValue.interpolate({
+    inputRange: [-1, 1],
+    outputRange: [-400, 400],
+  });
+
+  return (
+    <View style={StyleSheet.absoluteFillObject}>
+      <Animated.View style={{ flex: 1, transform: [{ translateX }] }}>
+        <LinearGradient
+          colors={['#E0E0E0', '#F5F5F5', '#E0E0E0']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={{ flex: 1 }}
+        />
+      </Animated.View>
+    </View>
+  );
+};
+
+const SkeletonCard = () => (
+  <View style={[itemStyles.card, { backgroundColor: '#E0E0E0', overflow: 'hidden' }]}>
+    <View style={itemStyles.timelineContainer}>
+      <View style={[itemStyles.iconContainer, {backgroundColor: '#BDBDBD'}]} />
+    </View>
+    <View style={itemStyles.detailsContainer}>
+      <View style={{ height: 14, width: '40%', backgroundColor: '#BDBDBD', borderRadius: 4 }} />
+      <View style={{ height: 18, width: '80%', backgroundColor: '#BDBDBD', borderRadius: 4, marginTop: 10 }} />
+      <View style={{ height: 14, width: '60%', backgroundColor: '#BDBDBD', borderRadius: 4, marginTop: 10 }} />
+    </View>
+    <Shimmer />
+  </View>
+);
+
+
+// --- Redesigned Card Components ---
 const ClassCard = ({ item }: { item: TimetableEvent }) => {
   const startTime = formatTime(parseCustomDate(item.start));
   const endTime = formatTime(parseCustomDate(item.end));
   return (
-    <View style={styles.card}>
-      <View style={styles.timeContainer}>
-        <Text style={styles.timeText}>{startTime}</Text>
-        <Text style={styles.timeTextEnd}>{endTime}</Text>
+    <View style={itemStyles.card}>
+      <View style={itemStyles.timelineContainer}>
+        <View style={[itemStyles.iconContainer, { backgroundColor: '#dbeafe' }]}>
+          <Icon name="book-outline" size={20} color="#2563eb" />
+        </View>
+        <View style={itemStyles.timelineLine} />
       </View>
-      <View style={styles.detailsContainer}>
-        <Text style={styles.courseName}>{item.courseName}</Text>
-        <Text style={styles.facultyName}>{item.facultyName}</Text>
-        <View style={styles.footerContainer}>
-          <Text style={styles.footerText}>{item.courseCode}</Text>
-          <Text style={styles.footerText}>Room: {item.classRoom || 'N/A'}</Text>
+      <View style={itemStyles.detailsContainer}>
+        <Text style={itemStyles.timeText}>{startTime} - {endTime}</Text>
+        <Text style={itemStyles.courseName}>{item.courseName}</Text>
+        <Text style={itemStyles.facultyName}>{item.facultyName}</Text>
+        <View style={itemStyles.footerContainer}>
+          <Icon name="location-outline" size={16} color="#7f8c8d" />
+          <Text style={itemStyles.footerText}>{item.classRoom || 'N/A'}</Text>
         </View>
       </View>
     </View>
@@ -70,16 +120,21 @@ const ClassCard = ({ item }: { item: TimetableEvent }) => {
 };
 
 const HolidayCard = ({ item }: { item: TimetableEvent }) => (
-  <View style={[styles.card, styles.holidayCard]}>
-    <View style={styles.detailsContainer}>
-      <Text style={styles.holidayTitle}>{item.title}</Text>
-      <Text style={styles.holidayContent}>{item.content}</Text>
+  <View style={itemStyles.card}>
+    <View style={itemStyles.timelineContainer}>
+      <View style={[itemStyles.iconContainer, { backgroundColor: '#ffedd5' }]}>
+        <Icon name="cafe-outline" size={20} color="#f97316" />
+      </View>
+      <View style={itemStyles.timelineLine} />
+    </View>
+    <View style={itemStyles.detailsContainer}>
+      <Text style={itemStyles.holidayTitle}>{item.title}</Text>
+      <Text style={itemStyles.holidayContent}>{item.content}</Text>
     </View>
   </View>
 );
 
 // --- Main Screen Component ---
-
 function TimetableScreen(): React.JSX.Element {
   const [sections, setSections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,8 +146,6 @@ function TimetableScreen(): React.JSX.Element {
         const weeklyEvents = await getWeeklySchedule();
         const todayKey = getTodayDateKey();
         const todaysEvents = weeklyEvents.filter(event => event.start.startsWith(todayKey));
-
-        // Classes ko start time ke hisaab se sort karein
         todaysEvents.sort((a, b) => parseCustomDate(a.start).getTime() - parseCustomDate(b.start).getTime());
 
         if (todaysEvents.length > 0) {
@@ -102,7 +155,7 @@ function TimetableScreen(): React.JSX.Element {
           setSections([]);
         }
       } catch (e: any) {
-        setError(e.message || 'Ek error aayi hai.');
+        setError(e.message || 'An error occurred.');
       } finally {
         setLoading(false);
       }
@@ -111,56 +164,77 @@ function TimetableScreen(): React.JSX.Element {
   }, []);
 
   if (loading) {
-    return <View style={styles.centerContainer}><ActivityIndicator size="large" color="#007aff" /></View>;
+    return (
+      <SafeAreaView style={styles.container}>
+        <Text style={styles.mainTitle}>Today's Schedule</Text>
+        <ScrollView contentContainerStyle={styles.listContentContainer} showsVerticalScrollIndicator={false}>
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </ScrollView>
+      </SafeAreaView>
+    );
   }
 
   if (error) {
-    return <View style={styles.centerContainer}><Text style={styles.errorText}>{error}</Text></View>;
+    return (
+      <SafeAreaView style={styles.centerContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+      </SafeAreaView>
+    );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.mainTitle}>Today's Schedule</Text>
-      {sections.length > 0 ? (
-        <SectionList
-          sections={sections}
-          keyExtractor={(item, index) => item.start + index}
-          renderItem={({ item }) => {
-            if (item.type === 'CLASS') return <ClassCard item={item} />;
-            if (item.type === 'HOLIDAY') return <HolidayCard item={item} />;
-            return null;
-          }}
-          renderSectionHeader={({ section: { title } }) => (
-            <Text style={styles.sectionHeader}>{formatSectionHeaderDate(title)}</Text>
-          )}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
-        />
-      ) : (
-        <View style={styles.centerContainer}><Text>Aaj ke liye koi schedule nahi hai.</Text></View>
-      )}
+      <SectionList
+        sections={sections}
+        ListHeaderComponent={<Text style={styles.mainTitle}>Today's Schedule</Text>}
+        keyExtractor={(item, index) => item.start + index}
+        renderItem={({ item }) => {
+          if (item.type === 'CLASS') return <ClassCard item={item} />;
+          if (item.type === 'HOLIDAY') return <HolidayCard item={item} />;
+          return null;
+        }}
+        renderSectionHeader={({ section: { title } }) => (
+          <Text style={styles.sectionHeader}>{formatSectionHeaderDate(title)}</Text>
+        )}
+        ListEmptyComponent={
+          <View style={styles.centerContainer}>
+            <Text style={styles.emptyText}>No schedule found for today.</Text>
+          </View>
+        }
+        contentContainerStyle={styles.listContentContainer}
+        stickySectionHeadersEnabled={false}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#f4f4f8' },
-    centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-    errorText: { color: 'red', fontSize: 16, textAlign: 'center' },
-    mainTitle: { fontSize: 28, fontWeight: 'bold', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 10, backgroundColor: '#f4f4f8' },
-    sectionHeader: { fontSize: 20, fontWeight: 'bold', paddingVertical: 12, backgroundColor: '#f4f4f8' },
-    card: { backgroundColor: 'white', borderRadius: 12, padding: 16, marginBottom: 12, flexDirection: 'row', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
-    timeContainer: { alignItems: 'center', marginRight: 16, paddingRight: 16, borderRightWidth: 1, borderRightColor: '#eee', justifyContent: 'center', width: 90 },
-    timeText: { fontSize: 16, fontWeight: 'bold', color: '#007aff' },
-    timeTextEnd: { fontSize: 14, color: 'gray', marginTop: 4 },
-    detailsContainer: { flex: 1 },
-    courseName: { fontSize: 18, fontWeight: '600', marginBottom: 4 },
-    facultyName: { fontSize: 16, color: '#555', marginBottom: 10 },
-    footerContainer: { flexDirection: 'row', justifyContent: 'space-between' },
-    footerText: { fontSize: 14, color: 'gray' },
-    holidayCard: { backgroundColor: '#eef7ff', borderColor: '#d0e8ff', borderWidth: 1 },
-    holidayTitle: { fontSize: 18, fontWeight: 'bold', color: '#005a9e' },
-    holidayContent: { fontSize: 16, color: '#005a9e', marginTop: 4 },
+  container: { flex: 1, backgroundColor: '#f4f6f8' },
+  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  errorText: { color: '#c0392b', fontSize: 16, textAlign: 'center' },
+  emptyText: { fontSize: 16, color: '#7f8c8d' },
+  mainTitle: { fontSize: 32, fontWeight: 'bold', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10, color: '#2c3e50' },
+  sectionHeader: { fontSize: 18, fontWeight: '600', paddingVertical: 12, color: '#7f8c8d', backgroundColor: '#f4f6f8' },
+  listContentContainer: { paddingHorizontal: 20, paddingBottom: 20 },
 });
 
-// ✅ Sahi component ko export kiya gaya hai
+const itemStyles = StyleSheet.create({
+  card: { flexDirection: 'row', alignItems: 'stretch' }, // Use stretch
+  timelineContainer: { alignItems: 'center', marginRight: 15 },
+  iconContainer: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', zIndex: 1, backgroundColor: 'white' },
+  timelineLine: { flex: 1, width: 2, backgroundColor: '#e0e0e0', marginTop: -10, marginBottom: -10 },
+  detailsContainer: { flex: 1, backgroundColor: 'white', borderRadius: 12, padding: 15, elevation: 2, shadowColor: '#95a5a6', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, marginBottom: 15 },
+  timeText: { fontSize: 14, color: '#2980b9', fontWeight: '600', marginBottom: 6 },
+  courseName: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50', marginBottom: 4 },
+  facultyName: { fontSize: 15, color: '#7f8c8d' },
+  footerContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
+  footerText: { marginLeft: 6, fontSize: 14, color: '#7f8c8d' },
+  holidayTitle: { fontSize: 18, fontWeight: 'bold', color: '#f97316' },
+  holidayContent: { fontSize: 15, color: '#7f8c8d', marginTop: 4 },
+});
+
 export default TimetableScreen;

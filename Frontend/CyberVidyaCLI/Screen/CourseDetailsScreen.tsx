@@ -1,16 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, SafeAreaView, StatusBar } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { getLectureWiseAttendance, Lecture } from '../api';
 import Icon from 'react-native-vector-icons/Ionicons';
+import LinearGradient from 'react-native-linear-gradient';
 
-// ✅ This component is now fixed
+// --- UI Component for single Lecture Item ---
 const LectureItem = ({ item }: { item: Lecture }) => {
   const isPresent = item.attendance === 'PRESENT';
   
-  // Parse the date string 'YYYY-MM-DD' safely
   const [year, month, day] = item.planLecDate.split('-').map(Number);
-  // Create date at noon (12 PM) to avoid timezone boundary issues. Month is 0-indexed.
   const date = new Date(year, month - 1, day, 12);
 
   const formattedDate = date.toLocaleDateString('en-IN', {
@@ -20,21 +19,24 @@ const LectureItem = ({ item }: { item: Lecture }) => {
   });
 
   return (
-    <View style={styles.itemContainer}>
-      <View style={styles.dateAndTopic}>
-        <Text style={styles.dateText}>{formattedDate}</Text>
-        <Text style={styles.topicText} numberOfLines={1}>
-          {item.topicCovered || 'Topic not specified'}
-        </Text>
+    <View style={itemStyles.card}>
+      <View style={itemStyles.leftContent}>
+        <Text style={itemStyles.dateText}>{formattedDate}</Text>
+        {item.topicCovered && (
+          <Text style={itemStyles.topicText} numberOfLines={2}>
+            {item.topicCovered}
+          </Text>
+        )}
       </View>
-      <View style={[styles.statusBadge, { backgroundColor: isPresent ? '#27ae60' : '#c0392b' }]}>
-        <Icon name={isPresent ? "checkmark-circle" : "close-circle"} size={16} color="white" />
-        <Text style={styles.statusText}>{item.attendance}</Text>
+      <View style={[itemStyles.statusBadge, { backgroundColor: isPresent ? '#27ae60' : '#c0392b' }]}>
+        <Icon name={isPresent ? "checkmark-circle-outline" : "close-circle-outline"} size={18} color="white" />
+        <Text style={itemStyles.statusText}>{item.attendance}</Text>
       </View>
     </View>
   );
 };
 
+// --- Main Screen Component ---
 function CourseDetailsScreen(): React.JSX.Element {
   const route = useRoute<any>();
   const { studentId, courseId, courseCompId, courseName } = route.params;
@@ -60,7 +62,7 @@ function CourseDetailsScreen(): React.JSX.Element {
 
   const renderContent = () => {
     if (loading) {
-      return <ActivityIndicator size="large" color="#2980b9" style={{ marginTop: 50 }} />;
+      return <ActivityIndicator size="large" color="#2980b9" style={styles.loader} />;
     }
     if (error) {
       return <Text style={styles.errorText}>{error}</Text>;
@@ -74,53 +76,98 @@ function CourseDetailsScreen(): React.JSX.Element {
         data={lectures}
         renderItem={({ item }) => <LectureItem item={item} />}
         keyExtractor={(item, index) => `${item.planLecDate}-${index}`}
+        contentContainerStyle={styles.listContentContainer}
       />
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title} numberOfLines={1}>{courseName}</Text>
-      </View>
-      {renderContent()}
+      <StatusBar barStyle="dark-content" backgroundColor="#f4f6f8" />
+      <LinearGradient colors={['#e7f2f8', '#f4f6f8']} style={styles.backgroundGradient}>
+        <View style={styles.header}>
+          <Text style={styles.title} numberOfLines={2}>{courseName}</Text>
+        </View>
+        {renderContent()}
+      </LinearGradient>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f6f8' },
+  backgroundGradient: { flex: 1 },
   header: {
-    paddingVertical: 20,
+    paddingVertical: 25,
     paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
     backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eceff1',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+    marginBottom: 10,
   },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#2c3e50' },
-  errorText: { textAlign: 'center', marginTop: 50, color: '#c0392b', fontSize: 16, paddingHorizontal: 20 },
-  infoText: { textAlign: 'center', marginTop: 50, color: 'gray', fontSize: 16 },
-  itemContainer: {
+  title: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    lineHeight: 32,
+  },
+  loader: { marginTop: 50 },
+  errorText: {
+    textAlign: 'center',
+    marginTop: 50,
+    color: '#c0392b',
+    fontSize: 16,
+    paddingHorizontal: 20,
+  },
+  infoText: {
+    textAlign: 'center',
+    marginTop: 50,
+    color: '#7f8c8d',
+    fontSize: 16,
+    paddingHorizontal: 20,
+  },
+  listContentContainer: {
+    paddingHorizontal: 15,
+    paddingBottom: 20,
+  },
+});
+
+const itemStyles = StyleSheet.create({
+  card: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 15,
     paddingVertical: 15,
     paddingHorizontal: 20,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ecf0f1',
+    marginBottom: 10,
+    shadowColor: '#95a5a6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
-  dateAndTopic: { flex: 1, marginRight: 10 },
-  dateText: { fontSize: 16, color: '#34495e', fontWeight: '500' },
-  topicText: { fontSize: 14, color: '#7f8c8d', marginTop: 2 },
+  leftContent: { flex: 1, marginRight: 15 },
+  dateText: { fontSize: 15, color: '#7f8c8d', fontWeight: 'bold' },
+  topicText: { fontSize: 17, color: '#2c3e50', marginTop: 5, lineHeight: 22 },
   statusBadge: {
-    borderRadius: 15,
+    borderRadius: 20,
     paddingVertical: 6,
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
+    minWidth: 90,
+    justifyContent: 'center',
   },
-  statusText: { color: 'white', fontSize: 12, fontWeight: 'bold', marginLeft: 5, textTransform: 'uppercase' },
+  statusText: { color: 'white', fontSize: 13, fontWeight: 'bold', marginLeft: 5, textTransform: 'uppercase' },
 });
 
 export default CourseDetailsScreen;
