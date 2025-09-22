@@ -5,7 +5,7 @@ import { gotScraping } from "got-scraping";
 
 router.post("/get-registered-courses", async (req, res) => {
     try {
-        const { authorization } = req.body;
+        const { authorization } = req.headers;
 
         if (!authorization) {
             return res.status(400).json({
@@ -163,7 +163,7 @@ router.post("/get-weekly-schedule", async (req, res) => {
 
 router.post("/get-dashboard-attendance", async (req, res) => {
     try {
-        const { authorization } = req.body;
+        const { authorization } = req.headers;
 
         if (!authorization) {
             return res.status(400).json({
@@ -194,7 +194,7 @@ router.post("/get-dashboard-attendance", async (req, res) => {
             return res.status(attendanceResponse.statusCode).json({ success: false, error: errorMessage });
         }
         
-        console.log("[SUCCESS] Dashboard attendance safaltapoorvak fetch ho gayi.");
+        console.log("[SUCCESS] Dashboard attendance  dashboard se aayaa hai");
         
         res.json({
             success: true,
@@ -227,7 +227,7 @@ router.post("/get-detailed-attendance", async (req, res) => {
         if (attendanceResponse.statusCode !== 200) {
             throw new Error(responseBody?.message || "Detailed attendance fetch nahi ho saki.");
         }
-        console.log("[SUCCESS] Detailed attendance data safaltapoorvak fetch ho gaya.");
+        console.log("[SUCCESS] Detailed attendance attendence se aaay ahai .");
         res.json({ success: true, data: responseBody });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -236,8 +236,9 @@ router.post("/get-detailed-attendance", async (req, res) => {
 
 router.post("/get-lecture-wise-attendance", async (req, res) => {
     try {
-        // Is endpoint ke liye hamein auth ke alawa kuch aur IDs bhi chahiye
-        const { authorization, studentId, courseId, courseCompId } = req.body;
+        
+        const {authorization} = req.headers;
+        const {  studentId, courseId, courseCompId } = req.body;
 
         if (!authorization || !studentId || !courseId || !courseCompId) {
             return res.status(400).json({

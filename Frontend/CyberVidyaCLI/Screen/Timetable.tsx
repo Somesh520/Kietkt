@@ -1,4 +1,4 @@
-// Screen/TimetableScreen.tsx (Poora Final Code)
+// Screen/TimetableScreen.tsx (FINAL CLEAN CODE)
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -9,23 +9,25 @@ import {
   SectionList,
   SafeAreaView,
 } from 'react-native';
-// ✅ Naye function ko import kiya gaya hai
 import { getWeeklySchedule, TimetableEvent } from '../api';
 
 // --- Helper Functions ---
 
-// "DD/MM/YYYY HH:mm:ss" format ko JavaScript Date object mein convert karne ke liye
+const getTodayDateKey = (): string => {
+  const today = new Date();
+  const day = String(today.getDate()).padStart(2, '0');
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const year = today.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
 const parseCustomDate = (dateString: string): Date => {
   const [datePart, timePart] = dateString.split(' ');
   const [day, month, year] = datePart.split('/');
   const [hours, minutes, seconds] = timePart.split(':');
-  
-  // ✅ Sahi Tareeka: Numbers ka istemal karein.
-  // Note: JavaScript mein mahine 0 se shuru hote hain (0=Jan, 1=Feb...), isliye month - 1 karna zaroori hai.
   return new Date(Number(year), Number(month) - 1, Number(day), Number(hours), Number(minutes), Number(seconds));
 };
 
-// Date object se time nikalne ke liye (e.g., 09:10 AM)
 const formatTime = (date: Date): string => {
   return date.toLocaleTimeString('en-IN', {
     hour: '2-digit',
@@ -34,10 +36,8 @@ const formatTime = (date: Date): string => {
   });
 };
 
-// Section header ke liye date format karne ke liye (e.g., Monday, 22 Sep)
 const formatSectionHeaderDate = (dateString: string): string => {
   const [day, month, year] = dateString.split('/');
-  // Din ke 12 baje ka time set kiya gaya hai taaki timezone ki galti na ho
   const date = new Date(Number(year), Number(month) - 1, Number(day), 12);
   return date.toLocaleDateString('en-IN', {
     weekday: 'long',
@@ -46,13 +46,11 @@ const formatSectionHeaderDate = (dateString: string): string => {
   });
 };
 
-
 // --- Card Components ---
 
 const ClassCard = ({ item }: { item: TimetableEvent }) => {
   const startTime = formatTime(parseCustomDate(item.start));
   const endTime = formatTime(parseCustomDate(item.end));
-
   return (
     <View style={styles.card}>
       <View style={styles.timeContainer}>
@@ -80,7 +78,6 @@ const HolidayCard = ({ item }: { item: TimetableEvent }) => (
   </View>
 );
 
-
 // --- Main Screen Component ---
 
 function TimetableScreen(): React.JSX.Element {
@@ -91,26 +88,19 @@ function TimetableScreen(): React.JSX.Element {
   useEffect(() => {
     const fetchAndGroupData = async () => {
       try {
-        // ✅ Naya function call kiya ja raha hai
-        const events = await getWeeklySchedule();
-        
-        // Data ko date ke hisaab se group karein
-        const groupedData = events.reduce((acc, event) => {
-          const dateKey = event.start.split(' ')[0]; // "DD/MM/YYYY"
-          if (!acc[dateKey]) {
-            acc[dateKey] = [];
-          }
-          acc[dateKey].push(event);
-          return acc;
-        }, {} as Record<string, TimetableEvent[]>);
-        
-        // SectionList ke format mein data ko convert karein
-        const sectionsArray = Object.keys(groupedData).map(date => ({
-          title: date,
-          data: groupedData[date],
-        }));
-        
-        setSections(sectionsArray);
+        const weeklyEvents = await getWeeklySchedule();
+        const todayKey = getTodayDateKey();
+        const todaysEvents = weeklyEvents.filter(event => event.start.startsWith(todayKey));
+
+        // Classes ko start time ke hisaab se sort karein
+        todaysEvents.sort((a, b) => parseCustomDate(a.start).getTime() - parseCustomDate(b.start).getTime());
+
+        if (todaysEvents.length > 0) {
+          const sectionsArray = [{ title: todayKey, data: todaysEvents }];
+          setSections(sectionsArray);
+        } else {
+          setSections([]);
+        }
       } catch (e: any) {
         setError(e.message || 'Ek error aayi hai.');
       } finally {
@@ -130,20 +120,14 @@ function TimetableScreen(): React.JSX.Element {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* ✅ Title ko update kiya gaya hai */}
-      <Text style={styles.mainTitle}>Weekly Schedule</Text>
+      <Text style={styles.mainTitle}>Today's Schedule</Text>
       {sections.length > 0 ? (
         <SectionList
           sections={sections}
           keyExtractor={(item, index) => item.start + index}
           renderItem={({ item }) => {
-            // type ke hisaab se alag card render karein
-            if (item.type === 'CLASS') {
-              return <ClassCard item={item} />;
-            }
-            if (item.type === 'HOLIDAY') {
-              return <HolidayCard item={item} />;
-            }
+            if (item.type === 'CLASS') return <ClassCard item={item} />;
+            if (item.type === 'HOLIDAY') return <HolidayCard item={item} />;
             return null;
           }}
           renderSectionHeader={({ section: { title } }) => (
@@ -152,7 +136,7 @@ function TimetableScreen(): React.JSX.Element {
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
         />
       ) : (
-        <View style={styles.centerContainer}><Text>Is hafte ke liye koi schedule nahi hai.</Text></View>
+        <View style={styles.centerContainer}><Text>Aaj ke liye koi schedule nahi hai.</Text></View>
       )}
     </SafeAreaView>
   );
@@ -178,4 +162,5 @@ const styles = StyleSheet.create({
     holidayContent: { fontSize: 16, color: '#005a9e', marginTop: 4 },
 });
 
+// ✅ Sahi component ko export kiya gaya hai
 export default TimetableScreen;

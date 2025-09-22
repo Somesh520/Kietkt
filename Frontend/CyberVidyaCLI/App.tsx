@@ -1,38 +1,51 @@
-// App.tsx (Poora Updated Code)
-
 import React, { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
-// ✅ Navigation ke liye imports
+// ✅ Navigation imports updated for Stack Navigator
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
 
 import LoginPage from './Screen/Login';
 import HomeScreen from './Screen/Home';
-import ProfileScreen from './Screen/profilescreen'; // Nayi screen import
-import TimetableScreen from './Screen/Timetable'; // Nayi screen import
+import ProfileScreen from './Screen/profilescreen'; // Corrected filename casing
+import TimetableScreen from './Screen/Timetable';
+import CourseDetailsScreen from './Screen/CourseDetailsScreen'; // ✅ Import the new screen
 import { logout } from './api';
+import Icon from 'react-native-vector-icons/Ionicons';
 
 const AUTH_TOKEN_KEY = 'authToken';
 
-// ✅ Tab navigator initialize karein
 const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator(); // ✅ Initialize Stack Navigator
 
-// ✅ Tabs wala component alag se banaya gaya
+// This component defines your bottom tabs
 function MainAppTabs({ onLogout }: { onLogout: () => void }) {
   return (
     <Tab.Navigator
-      screenOptions={{
-        tabBarActiveTintColor: '#007aff',
+      screenOptions={({ route }) => ({
+        // Function to set icons for each tab
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName = '';
+          if (route.name === 'Home') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Timetable') {
+            iconName = focused ? 'calendar' : 'calendar-outline';
+          } else if (route.name === 'Profile') {
+            iconName = focused ? 'person-circle' : 'person-circle-outline';
+          }
+          return <Icon name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: '#2980b9',
         tabBarInactiveTintColor: 'gray',
-        tabBarStyle: { paddingBottom: 5, height: 60 },
+        headerShown: false, // We hide the default header for tab screens
+        tabBarStyle: { paddingBottom: 5, paddingTop: 5, height: 60 },
         tabBarLabelStyle: { fontSize: 12 },
-      }}
+      })}
     >
       <Tab.Screen 
         name="Home"
-        // Pass onLogout prop to HomeScreen
         children={() => <HomeScreen onLogout={onLogout} />}
       />
       <Tab.Screen name="Timetable" component={TimetableScreen} />
@@ -41,6 +54,26 @@ function MainAppTabs({ onLogout }: { onLogout: () => void }) {
   );
 }
 
+// ✅ This is the main navigator for your app after login
+// It contains both the Tab Navigator and any other screens you want to navigate to
+function AppStack({ onLogout }: { onLogout: () => void }) {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen 
+        name="MainTabs" 
+        children={() => <MainAppTabs onLogout={onLogout} />}
+        options={{ headerShown: false }} // The tabs screen doesn't need its own header
+      />
+      <Stack.Screen 
+        name="CourseDetails" 
+        component={CourseDetailsScreen}
+        options={{ title: 'Lecture Details' }} // This title will show on the details screen
+      />
+    </Stack.Navigator>
+  );
+}
+
+// Main App Component
 function App(): React.JSX.Element {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,16 +99,16 @@ function App(): React.JSX.Element {
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#2980b9" />
       </View>
     );
   }
 
   return (
-    // ✅ Poori app ko NavigationContainer mein wrap karein
     <NavigationContainer>
         {authToken ? (
-            <MainAppTabs onLogout={handleLogout} />
+            // ✅ After login, we now render the Stack Navigator
+            <AppStack onLogout={handleLogout} />
         ) : (
             <LoginPage onLoginSuccess={handleLoginSuccess} />
         )}

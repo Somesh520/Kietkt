@@ -41,6 +41,41 @@ export interface TimetableEvent {
   content: string;
 }
 
+export interface DashboardAttendance {
+  presentPerc: number;
+  absentPerc: number;
+}
+
+export interface CourseComponentDetail {
+  courseCompId: number;
+  courseCompFacultyName: string;
+  presentLecture: number;
+  totalLecture: number;
+}
+
+export interface RegisteredCourse {
+  studentId: number;
+  courseId: number;
+  courseCode: string;
+  courseName: string;
+  studentCourseCompDetails: CourseComponentDetail[];
+}
+
+export interface Lecture {
+  planLecDate: string; // "2025-09-15"
+  topicCovered: string | null;
+  attendance: 'PRESENT' | 'ABSENT' | string;
+  timeSlot: string; // "10:00 AM - 10:50 AM"
+}
+
+// ✅ NEW: Interface for the entire response of the API
+export interface LectureWiseAttendance {
+  presentCount: number;
+  lectureCount: number;
+  percent: number;
+  lectureList: Lecture[];
+}
+
 export const apiClient = axios.create({ baseURL: API_BASE_URL });
 
 // Interceptors...
@@ -148,5 +183,54 @@ export const getWeeklySchedule = async (): Promise<TimetableEvent[]> => {
         }
     } catch (err: any) {
         throw new Error(err.response?.data?.error || err.message || 'API se weekly schedule fetch karne mein error aaya.');
+    }
+};
+
+export const getDashboardAttendance = async (): Promise<DashboardAttendance> => {
+    try {
+        const response = await apiClient.post<ApiResponse<{ data: DashboardAttendance }>>('/get-dashboard-attendance');
+        
+        if (response.data && response.data.success && response.data.data && response.data.data.data) {
+            return response.data.data.data;
+        } else {
+            throw new Error(response.data.error || "Dashboard attendance format is incorrect.");
+        }
+    } catch (err: any) {
+        throw new Error(err.response?.data?.error || err.message || 'Could not fetch dashboard attendance.');
+    }
+};
+
+export const getRegisteredCourses = async (): Promise<RegisteredCourse[]> => {
+    try {
+        const response = await apiClient.post<ApiResponse<{ data: RegisteredCourse[] }>>('/get-registered-courses');
+        if (response.data?.success && response.data?.data?.data) {
+            return response.data.data.data;
+        } else {
+            throw new Error(response.data.error || "Registered courses ka format galat hai.");
+        }
+    } catch (err: any) {
+        throw new Error(err.response?.data?.error || err.message || 'Registered courses fetch nahi ho sake.');
+    }
+};
+
+// ✅ NEW: Lecture-wise attendance fetch karne ke liye function
+// api.ts mein is function ko replace karein
+
+export const getLectureWiseAttendance = async (params: { studentId: number; courseId: number; courseCompId: number }): Promise<Lecture[]> => {
+    try {
+        const response = await apiClient.post<ApiResponse<{ data: LectureWiseAttendance[] }>>('/get-lecture-wise-attendance', params);
+        
+        // Check if the nested data and the lectureList array exist
+        if (response.data?.success && response.data?.data?.data?.[0]?.lectureList) {
+            // ✅ FIX: Return the 'lectureList' array directly
+            return response.data.data.data[0].lectureList;
+        } else {
+            // If no lectures are found, return an empty array to prevent crashing
+            console.log("No lecture list found for this course, returning empty array.");
+            return [];
+        }
+    } catch (err: any) {
+        console.error("Error fetching lecture-wise attendance:", err.message);
+        throw new Error(err.response?.data?.error || err.message || 'API Error: Could not fetch lecture-wise attendance.');
     }
 };
