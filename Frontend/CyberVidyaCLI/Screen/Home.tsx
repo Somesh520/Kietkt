@@ -3,115 +3,127 @@ import {
   View,
   Text,
   StyleSheet,
-  ActivityIndicator,
   SafeAreaView,
   TouchableOpacity,
   Pressable,
   FlatList,
   RefreshControl,
   Button,
-  LayoutAnimation,
-  UIManager,
   Platform,
+  UIManager,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { 
-  getAttendanceAndDetails, 
-  UserDetails, 
-  getDashboardAttendance, 
-  DashboardAttendance, 
-  getRegisteredCourses, 
-  RegisteredCourse 
+import {
+  getAttendanceAndDetails,
+  UserDetails,
+  getDashboardAttendance,
+  DashboardAttendance,
+  getRegisteredCourses,
+  RegisteredCourse
 } from '../api';
 import { CircularProgress } from 'react-native-circular-progress';
 import Icon from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
+// NEW: Import animation libraries
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay } from 'react-native-reanimated';
+import { createShimmerPlaceholder } from 'react-native-shimmer-placeholder';
+
+const ShimmerPlaceholder = createShimmerPlaceholder(LinearGradient);
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// --- Helper Functions ---
+// --- Helper Functions (No changes here) ---
 const getGreeting = (): string => {
   const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) { // From 5 AM to 11:59 AM
-    return "Good Morning,";
-  }
-  if (hour >= 12 && hour < 18) { // From 12 PM to 5:59 PM
-    return "Good Afternoon,";
-  }
-  return "Good Evening,"; // From 6 PM to 4:59 AM
+  if (hour >= 5 && hour < 12) return "Good Morning,";
+  if (hour >= 12 && hour < 18) return "Good Afternoon,";
+  return "Good Evening,";
 };
 
 const getAttendanceInfo = (present: number, total: number) => {
-  if (total === 0) {
-    return { status: 'safe', message: 'No classes have been held yet.' };
-  }
+  if (total === 0) return { status: 'safe', message: 'No classes have been held yet.' };
   const currentPercentage = (present / total) * 100;
   let status: 'safe' | 'warning' | 'danger' = 'safe';
-  if (currentPercentage < 75 && currentPercentage >= 65) {
-    status = 'warning';
-  } else if (currentPercentage < 65) {
-    status = 'danger';
-  }
+  if (currentPercentage < 75 && currentPercentage >= 65) status = 'warning';
+  else if (currentPercentage < 65) status = 'danger';
+
   if (currentPercentage >= 75) {
     const canMiss = Math.floor(present / 0.75 - total);
-    if (canMiss > 0) {
-      return { status, message: `You can miss ${canMiss} more classes.` };
-    }
-    return { status, message: 'Do not miss any more classes to maintain 75%.' };
+    return { status, message: canMiss > 0 ? `You can miss ${canMiss} more classes.` : 'Do not miss any more classes to maintain 75%.' };
   } else {
     const mustAttend = Math.ceil(3 * total - 4 * present);
     return { status, message: `You must attend the next ${mustAttend} classes for 75%.` };
   }
 };
 
-// --- UI Components ---
+// --- UI Components (No changes to SmartSummary) ---
 const SmartSummary = ({ present, total }: { present: number, total: number }) => {
-  const { status, message } = getAttendanceInfo(present, total);
-  if (total === 0) {
-    return (
-      <View style={styles.summaryBox}>
-        <Icon name="hourglass-outline" size={30} color="#3498db" />
-        <View style={styles.summaryContent}>
-          <Text style={styles.summaryStatusText}>Classes Haven't Started</Text>
-          <Text style={styles.summaryDetailText}>{message}</Text>
+    // ... (This component remains exactly the same as in your original code)
+    const { status, message } = getAttendanceInfo(present, total);
+    if (total === 0) {
+      return (
+        <View style={styles.summaryBox}>
+          <Icon name="hourglass-outline" size={30} color="#3498db" />
+          <View style={styles.summaryContent}>
+            <Text style={styles.summaryStatusText}>Classes Haven't Started</Text>
+            <Text style={styles.summaryDetailText}>{message}</Text>
+          </View>
         </View>
-      </View>
-    );
-  }
-  if (status === 'safe') {
-    const canMiss = Math.floor(present / 0.75 - total);
-    return (
-      <View style={styles.summaryBox}>
-        <Icon name="shield-checkmark" size={40} color="#27ae60" />
-        <View style={styles.summaryContent}>
-          <Text style={styles.summaryStatusText}>Attendance is Safe</Text>
-          {canMiss > 0 ? (
-            <Text style={styles.canMissText}>You can miss {canMiss} more classes.</Text>
-          ) : (
-            <Text style={styles.summaryDetailText}>Don't miss any classes to stay above 75%.</Text>
-          )}
+      );
+    }
+    if (status === 'safe') {
+      const canMiss = Math.floor(present / 0.75 - total);
+      return (
+        <View style={styles.summaryBox}>
+          <Icon name="shield-checkmark" size={40} color="#27ae60" />
+          <View style={styles.summaryContent}>
+            <Text style={styles.summaryStatusText}>Attendance is Safe</Text>
+            {canMiss > 0 ? (
+              <Text style={styles.canMissText}>You can miss {canMiss} more classes.</Text>
+            ) : (
+              <Text style={styles.summaryDetailText}>Don't miss any classes to stay above 75%.</Text>
+            )}
+          </View>
         </View>
-      </View>
-    );
-  } else {
-    return (
-      <View style={[styles.summaryBox, styles.summaryBoxWarning]}>
-        <Icon name="warning" size={40} color={status === 'danger' ? '#c0392b' : '#f39c12'} />
-        <View style={styles.summaryContent}>
-          <Text style={styles.summaryStatusText}>Action Required!</Text>
-          <Text style={styles.summaryDetailText}>{message}</Text>
+      );
+    } else {
+      return (
+        <View style={[styles.summaryBox, styles.summaryBoxWarning]}>
+          <Icon name="warning" size={40} color={status === 'danger' ? '#c0392b' : '#f39c12'} />
+          <View style={styles.summaryContent}>
+            <Text style={styles.summaryStatusText}>Action Required!</Text>
+            <Text style={styles.summaryDetailText}>{message}</Text>
+          </View>
         </View>
-      </View>
-    );
-  }
+      );
+    }
 };
 
-const AttendanceCard = ({ item }: { item: RegisteredCourse }) => {
+// MODIFIED: Wrapped AttendanceCard in an Animated component for staggered entry
+const AnimatedAttendanceCard = ({ item, index }: { item: RegisteredCourse, index: number }) => {
   const navigation = useNavigation<any>();
-  const { courseName, courseCode, studentId, courseId, studentCourseCompDetails } = item;
+  const { courseName, courseId, studentId, studentCourseCompDetails } = item;
   const details = studentCourseCompDetails?.[0];
+
+  // Animation values
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(20);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: opacity.value,
+      transform: [{ translateY: translateY.value }],
+    };
+  });
+
+  useEffect(() => {
+    // Staggered animation with a delay based on the item's index
+    opacity.value = withDelay(index * 100, withTiming(1, { duration: 400 }));
+    translateY.value = withDelay(index * 100, withTiming(0, { duration: 400 }));
+  }, []);
+
   if (!details) return null;
 
   const { courseCompId, presentLecture, totalLecture } = details;
@@ -126,26 +138,52 @@ const AttendanceCard = ({ item }: { item: RegisteredCourse }) => {
   };
 
   return (
-    <TouchableOpacity onPress={handlePress} activeOpacity={0.9} style={styles.card}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.courseName} numberOfLines={2}>{courseName}</Text>
-        <View style={styles.percentageContainer}>
-          <Text style={[styles.percentageText, { color: progressColor }]}>{percentage.toFixed(1)}%</Text>
+    <Animated.View style={animatedStyle}>
+      <TouchableOpacity onPress={handlePress} activeOpacity={0.9} style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.courseName} numberOfLines={2}>{courseName}</Text>
+          <View style={styles.percentageContainer}>
+            <Text style={[styles.percentageText, { color: progressColor }]}>{percentage.toFixed(1)}%</Text>
+          </View>
         </View>
-      </View>
-      <Text style={styles.attendedText}>{present} of {total} Attended</Text>
-      <View style={styles.progressBarBackground}>
-        <View style={[styles.progressBar, { width: `${percentage}%`, backgroundColor: progressColor }]} />
-      </View>
-      <SmartSummary present={present} total={total} />
-      <View style={styles.footerSeparator} />
-      <Pressable onPress={handlePress} style={({ pressed }) => [styles.cardFooterAction, pressed && styles.pressed]}>
-        <Text style={styles.viewDetailsText}>View Details</Text>
-        <Icon name="arrow-forward-circle" size={22} color="#2980b9" />
-      </Pressable>
-    </TouchableOpacity>
+        <Text style={styles.attendedText}>{present} of {total} Attended</Text>
+        <View style={styles.progressBarBackground}>
+          <View style={[styles.progressBar, { width: `${percentage}%`, backgroundColor: progressColor }]} />
+        </View>
+        <SmartSummary present={present} total={total} />
+        <View style={styles.footerSeparator} />
+        <Pressable onPress={handlePress} style={({ pressed }) => [styles.cardFooterAction, pressed && styles.pressed]}>
+          <Text style={styles.viewDetailsText}>View Details</Text>
+          <Icon name="arrow-forward-circle" size={22} color="#2980b9" />
+        </Pressable>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
+
+// NEW: Skeleton loader component
+const SkeletonPlaceholderComponent = () => (
+    <SafeAreaView style={styles.safeArea}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 10 }}>
+        {/* Header Skeleton */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 }}>
+            <View>
+                <ShimmerPlaceholder style={{ width: 150, height: 20, borderRadius: 5, marginBottom: 8 }} />
+                <ShimmerPlaceholder style={{ width: 120, height: 30, borderRadius: 5 }} />
+            </View>
+            <ShimmerPlaceholder style={{ width: 80, height: 38, borderRadius: 20 }} />
+        </View>
+        {/* Details Card Skeleton */}
+        <ShimmerPlaceholder style={[styles.detailCard, { height: 140, padding: 0 }]} />
+        {/* Overall Summary Skeleton */}
+        <ShimmerPlaceholder style={[styles.card, { height: 180, marginBottom: 24 }]} />
+        {/* Subject Cards Skeleton */}
+        <ShimmerPlaceholder style={[styles.card, { height: 230 }]} />
+        <ShimmerPlaceholder style={[styles.card, { height: 230, marginTop: -6 }]} />
+      </View>
+    </SafeAreaView>
+);
+
 
 // --- Main Screen Component ---
 function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
@@ -158,7 +196,7 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
 
   const fetchAllData = useCallback(async () => {
     try {
-      if(!refreshing) setLoading(true);
+      if (!refreshing) setLoading(true);
       setError(null);
       const [details, dashboard, registeredCourses] = await Promise.all([
         getAttendanceAndDetails(),
@@ -177,17 +215,18 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
   }, [refreshing]);
 
   useEffect(() => {
-    fetchAllData().then(() => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    });
-  }, [fetchAllData]);
+    fetchAllData();
+  }, [fetchAllData]); // REMOVED: LayoutAnimation from here
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
+    // NEW: We re-trigger fetchAllData directly on refresh
+    fetchAllData();
   }, []);
 
+  // MODIFIED: Show skeleton loader instead of ActivityIndicator
   if (loading && !refreshing) {
-    return <View style={styles.centerContainer}><ActivityIndicator size="large" color="#2980b9" /></View>;
+    return <SkeletonPlaceholderComponent />;
   }
 
   if (error) {
@@ -195,12 +234,12 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
       <View style={styles.centerContainer}>
         <Text style={styles.errorText}>{error}</Text>
         <Button title="Refresh" onPress={fetchAllData} color="#2980b9" />
-        <View style={{marginTop: 10}} />
+        <View style={{ marginTop: 10 }} />
         <Button title="Logout" onPress={onLogout} color="#c0392b" />
       </View>
     );
   }
-  
+
   const ListHeader = () => (
     <View style={styles.headerContainer}>
       <View style={styles.header}>
@@ -243,10 +282,11 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <LinearGradient colors={['#e7f2f8', '#f4f6f8']} style={{flex: 1}}>
+      <LinearGradient colors={['#e7f2f8', '#f4f6f8']} style={{ flex: 1 }}>
         <FlatList
           data={courses}
-          renderItem={({ item }) => <AttendanceCard item={item} />}
+          // MODIFIED: Use the new animated component and pass the index
+          renderItem={({ item, index }) => <AnimatedAttendanceCard item={item} index={index} />}
           keyExtractor={(item) => item.courseId.toString()}
           ListHeaderComponent={ListHeader}
           showsVerticalScrollIndicator={false}
@@ -258,45 +298,46 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
   );
 }
 
+// Styles (No changes needed here, they work well with the new components)
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#e7f2f8' },
-  headerContainer: { paddingTop: 10 },
-  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f4f6f8' },
-  errorText: { color: '#c0392b', textAlign: 'center', marginBottom: 20, fontSize: 16 },
-  header: { paddingVertical: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  greeting: { fontSize: 20, color: '#7f8c8d' },
-  title: { fontSize: 30, fontWeight: 'bold', color: '#2c3e50' },
-  logoutButton: { backgroundColor: 'rgba(236, 240, 241, 0.8)', paddingHorizontal: 16, paddingVertical: 9, borderRadius: 20 },
-  logoutButtonText: { color: '#34495e', fontWeight: '600', fontSize: 14 },
-  listHeader: { fontSize: 22, fontWeight: 'bold', color: '#2c3e50', marginBottom: 16 },
-  card: { backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 20, marginBottom: 16, padding: 20, elevation: 4, shadowColor: '#95a5a6', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.15, shadowRadius: 10, borderWidth: 1, borderColor: '#fff' },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  courseName: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50', flex: 1, marginRight: 10, lineHeight: 24 },
-  percentageContainer: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.05)' },
-  percentageText: { fontSize: 20, fontWeight: 'bold' },
-  attendedText: { fontSize: 15, color: '#7f8c8d', marginTop: 4, marginBottom: 12 },
-  progressBarBackground: { height: 8, backgroundColor: '#ecf0f1', borderRadius: 4, overflow: 'hidden' },
-  progressBar: { height: '100%', borderRadius: 4 },
-  summaryBox: { flexDirection: 'row', marginTop: 15, backgroundColor: 'rgba(232, 245, 233, 0.8)', borderRadius: 12, padding: 15, alignItems: 'center' },
-  summaryBoxWarning: { backgroundColor: 'rgba(255, 243, 224, 0.8)' },
-  summaryContent: { flex: 1, marginLeft: 15 },
-  summaryStatusText: { fontSize: 16, fontWeight: 'bold', color: '#333' },
-  summaryDetailText: { fontSize: 14, color: '#555', marginTop: 2, lineHeight: 20 },
-  canMissText: { fontSize: 18, fontWeight: 'bold', color: '#27ae60', marginTop: 2 },
-  detailCard: { backgroundColor: 'white', borderRadius: 15, padding: 10, marginBottom: 16, elevation: 3, borderWidth: 1, borderColor: '#fff' },
-  detailRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#ecf0f1' },
-  iconStyle: { marginRight: 15, marginLeft: 5 },
-  detailLabel: { fontSize: 16, color: '#34495e', flex: 1 },
-  detailValue: { fontSize: 16, fontWeight: 'bold', color: '#2c3e50' },
-  summaryContainer: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
-  summaryTextContainer: { flex: 1, marginLeft: 20, justifyContent: 'center' },
-  summaryTitle: { fontSize: 20, fontWeight: 'bold', color: '#2c3e50', marginBottom: 4 },
-  summarySubtitle: { fontSize: 15, color: '#7f8c8d', lineHeight: 22 },
-  progressText: { fontSize: 28, fontWeight: 'bold', color: '#2c3e50' },
-  footerSeparator: { height: 1, backgroundColor: '#ecf0f1', marginTop: 15 },
-  cardFooterAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingTop: 15 },
-  viewDetailsText: { color: '#2980b9', fontSize: 16, fontWeight: '600', marginRight: 8 },
-  pressed: { opacity: 0.7 },
-});
+    safeArea: { flex: 1, backgroundColor: '#e7f2f8' },
+    headerContainer: { paddingTop: 10 },
+    centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f4f6f8' },
+    errorText: { color: '#c0392b', textAlign: 'center', marginBottom: 20, fontSize: 16 },
+    header: { paddingVertical: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    greeting: { fontSize: 20, color: '#7f8c8d' },
+    title: { fontSize: 30, fontWeight: 'bold', color: '#2c3e50' },
+    logoutButton: { backgroundColor: 'rgba(236, 240, 241, 0.8)', paddingHorizontal: 16, paddingVertical: 9, borderRadius: 20 },
+    logoutButtonText: { color: '#34495e', fontWeight: '600', fontSize: 14 },
+    listHeader: { fontSize: 22, fontWeight: 'bold', color: '#2c3e50', marginBottom: 16 },
+    card: { backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 20, marginBottom: 16, padding: 20, elevation: 4, shadowColor: '#95a5a6', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.15, shadowRadius: 10, borderWidth: 1, borderColor: '#fff' },
+    cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+    courseName: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50', flex: 1, marginRight: 10, lineHeight: 24 },
+    percentageContainer: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.05)' },
+    percentageText: { fontSize: 20, fontWeight: 'bold' },
+    attendedText: { fontSize: 15, color: '#7f8c8d', marginTop: 4, marginBottom: 12 },
+    progressBarBackground: { height: 8, backgroundColor: '#ecf0f1', borderRadius: 4, overflow: 'hidden' },
+    progressBar: { height: '100%', borderRadius: 4 },
+    summaryBox: { flexDirection: 'row', marginTop: 15, backgroundColor: 'rgba(232, 245, 233, 0.8)', borderRadius: 12, padding: 15, alignItems: 'center' },
+    summaryBoxWarning: { backgroundColor: 'rgba(255, 243, 224, 0.8)' },
+    summaryContent: { flex: 1, marginLeft: 15 },
+    summaryStatusText: { fontSize: 16, fontWeight: 'bold', color: '#333' },
+    summaryDetailText: { fontSize: 14, color: '#555', marginTop: 2, lineHeight: 20 },
+    canMissText: { fontSize: 18, fontWeight: 'bold', color: '#27ae60', marginTop: 2 },
+    detailCard: { backgroundColor: 'white', borderRadius: 15, padding: 10, marginBottom: 16, elevation: 3, borderWidth: 1, borderColor: '#fff' },
+    detailRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#ecf0f1' },
+    iconStyle: { marginRight: 15, marginLeft: 5 },
+    detailLabel: { fontSize: 16, color: '#34495e', flex: 1 },
+    detailValue: { fontSize: 16, fontWeight: 'bold', color: '#2c3e50' },
+    summaryContainer: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
+    summaryTextContainer: { flex: 1, marginLeft: 20, justifyContent: 'center' },
+    summaryTitle: { fontSize: 20, fontWeight: 'bold', color: '#2c3e50', marginBottom: 4 },
+    summarySubtitle: { fontSize: 15, color: '#7f8c8d', lineHeight: 22 },
+    progressText: { fontSize: 28, fontWeight: 'bold', color: '#2c3e50' },
+    footerSeparator: { height: 1, backgroundColor: '#ecf0f1', marginTop: 15 },
+    cardFooterAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingTop: 15 },
+    viewDetailsText: { color: '#2980b9', fontSize: 16, fontWeight: '600', marginRight: 8 },
+    pressed: { opacity: 0.7 },
+  });
 
 export default HomeScreen;
