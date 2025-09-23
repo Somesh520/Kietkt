@@ -15,9 +15,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-               BuildableName = "CyberVidyaCLI.app"
-               BlueprintName = "CyberVidyaCLI"
-               ReferencedContainer = "container:CyberVidyaCLI.xcodeproj">
+               BuildableName = "BunkBook.app"
+               BlueprintName = "BunkBook"
+               ReferencedContainer = "container:BunkBook.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "00E356ED1AD99517003FC87E"
-               BuildableName = "CyberVidyaCLITests.xctest"
-               BlueprintName = "CyberVidyaCLITests"
-               ReferencedContainer = "container:CyberVidyaCLI.xcodeproj">
+               BuildableName = "BunkBookTests.xctest"
+               BlueprintName = "BunkBookTests"
+               ReferencedContainer = "container:BunkBook.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -55,9 +55,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "CyberVidyaCLI.app"
-            BlueprintName = "CyberVidyaCLI"
-            ReferencedContainer = "container:CyberVidyaCLI.xcodeproj">
+            BuildableName = "BunkBook.app"
+            BlueprintName = "BunkBook"
+            ReferencedContainer = "container:BunkBook.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -72,9 +72,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "CyberVidyaCLI.app"
-            BlueprintName = "CyberVidyaCLI"
-            ReferencedContainer = "container:CyberVidyaCLI.xcodeproj">
+            BuildableName = "BunkBook.app"
+            BlueprintName = "BunkBook"
+            ReferencedContainer = "container:BunkBook.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
