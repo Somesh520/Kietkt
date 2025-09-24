@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, SafeAreaView, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, FlatList, SafeAreaView, StatusBar } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { getLectureWiseAttendance, Lecture } from '../api';
 import Icon from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
+// ✅ Import Shimmer Placeholder
+import { createShimmerPlaceholder } from 'react-native-shimmer-placeholder';
+
+const ShimmerPlaceholder = createShimmerPlaceholder(LinearGradient);
 
 // --- UI Component for single Lecture Item ---
 const LectureItem = ({ item }: { item: Lecture }) => {
@@ -36,6 +40,24 @@ const LectureItem = ({ item }: { item: Lecture }) => {
   );
 };
 
+// ✅ --- NEW: Skeleton Loader Component ---
+const SkeletonLectureItem = () => (
+  <View style={[itemStyles.card, { borderColor: 'transparent' }]}>
+    <View style={itemStyles.leftContent}>
+      <ShimmerPlaceholder style={{ width: 120, height: 16, borderRadius: 4 }} />
+      <ShimmerPlaceholder style={{ width: '90%', height: 20, borderRadius: 4, marginTop: 8 }} />
+    </View>
+    <ShimmerPlaceholder style={{ width: 95, height: 32, borderRadius: 20 }} />
+  </View>
+);
+
+const SkeletonLoader = () => (
+  <View style={styles.listContentContainer}>
+    {[...Array(6)].map((_, index) => <SkeletonLectureItem key={index} />)}
+  </View>
+);
+
+
 // --- Main Screen Component ---
 function CourseDetailsScreen(): React.JSX.Element {
   const route = useRoute<any>();
@@ -60,9 +82,10 @@ function CourseDetailsScreen(): React.JSX.Element {
     fetchLectures();
   }, [studentId, courseId, courseCompId]);
 
+  // ✅ Modified to show the skeleton loader
   const renderContent = () => {
     if (loading) {
-      return <ActivityIndicator size="large" color="#2980b9" style={styles.loader} />;
+      return <SkeletonLoader />;
     }
     if (error) {
       return <Text style={styles.errorText}>{error}</Text>;
@@ -116,7 +139,6 @@ const styles = StyleSheet.create({
     color: '#2c3e50',
     lineHeight: 32,
   },
-  loader: { marginTop: 50 },
   errorText: {
     textAlign: 'center',
     marginTop: 50,
@@ -134,6 +156,7 @@ const styles = StyleSheet.create({
   listContentContainer: {
     paddingHorizontal: 15,
     paddingBottom: 20,
+    paddingTop: 5, // Add some top padding for the skeleton
   },
 });
 

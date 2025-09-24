@@ -32,7 +32,7 @@ function MainAppTabs({ onLogout }: { onLogout: () => void }) {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Timetable') {
             iconName = focused ? 'calendar' : 'calendar-outline';
-          } else if (route.name === 'Profile') {
+          } else if (route.name === 'About us') { // ✅ Corrected from 'Profile' to 'About us'
             iconName = focused ? 'person-circle' : 'person-circle-outline';
           }
           return <Icon name={iconName} size={size} color={color} />;
