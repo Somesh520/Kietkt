@@ -3,7 +3,7 @@ import { gotScraping } from "got-scraping";
 
 const router = express.Router();
 
-// Route: '/get-session' - Login karke Authorization Token haasil karne ke liye
+
 router.post("/get-session", async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -41,15 +41,12 @@ router.post("/get-session", async (req, res) => {
         authorization: authorizationHeader, 
       });
     } else {
-      // ✅ FIX: Special check for account lockout warnings
       let errorMessage;
-      const cyberVidyaMessage = responseBody?.message || ""; // Get the message safely
+      const cyberVidyaMessage = responseBody?.message || ""; 
 
       if (cyberVidyaMessage.toLowerCase().includes('attempt left')) {
-        // If the message contains "attempt left", use that exact message
         errorMessage = cyberVidyaMessage;
       } else {
-        // Otherwise, use a standard error message
         errorMessage = "Login failed. Please check your credentials.";
       }
       
@@ -59,20 +56,25 @@ router.post("/get-session", async (req, res) => {
     }
 
   } catch (error) {
+    // CyberVidya server down hone ki error ko yahan handle kiya gaya hai
+    if (['ETIMEDOUT', 'ECONNRESET', 'ENOTFOUND', 'ECONNREFUSED'].includes(error.code)) {
+        console.error("❌ NETWORK ERROR in /get-session:", error.message);
+        return res.status(503).json({ success: false, error: "The CyberVidya server is not responding. Please try again later." });
+    }
+
     const errorMessage = error.message || "An unknown error occurred during login.";
     console.error("❌ CRITICAL ERROR in /get-session:", errorMessage);
     res.status(500).json({ success: false, error: errorMessage });
   }
 });
 
-// NAYA Route: '/get-attendance' - Token ka istemal karke attendance data fetch karne ke liye
 
 
 
-// Default route
-router.get("/", (req, res) => {
-  res.send("Hello from Attendance API 🚀");
-});
 
+
+
+
+//we end here
 export default router;
 

@@ -1,4 +1,3 @@
-import e from 'express';
 import express from 'express';
 const router = express.Router();
 import { gotScraping } from "got-scraping";
@@ -10,20 +9,19 @@ router.post("/get-registered-courses", async (req, res) => {
         if (!authorization) {
             return res.status(400).json({
                 success: false,
-                error: "Authorization token zaroori hai",
+                error: "Authorization token is required",
             });
         }
         
-        console.log("[INFO] Registered courses ka data fetch kiya ja raha hai...");
+        console.log("[INFO] Fetching registered courses data...");
 
-        // Screenshot se mila sahi URL
         const coursesUrl = "https://kiet.cybervidya.net/api/student/dashboard/registered-courses";
 
         const coursesResponse = await gotScraping({
             url: coursesUrl,
             method: 'GET',
             headers: {
-                'Authorization': authorization, // Auth token header mein bhejein
+                'Authorization': authorization,
             },
             responseType: 'json',
             throwHttpErrors: false,
@@ -32,79 +30,25 @@ router.post("/get-registered-courses", async (req, res) => {
         const responseBody = coursesResponse.body;
 
         if (coursesResponse.statusCode !== 200) {
-            const errorMessage = responseBody?.message || "Registered courses fetch nahi ho sake. Token invalid ya expire ho sakta hai.";
-            console.error(`[ERROR] Registered courses fetch karne mein galti: ${errorMessage}`);
+            const errorMessage = responseBody?.message || "Could not fetch registered courses. Token might be invalid or expired.";
+            console.error(`[ERROR] Error fetching registered courses: ${errorMessage}`);
             return res.status(coursesResponse.statusCode).json({ success: false, error: errorMessage });
         }
         
-        console.log("[SUCCESS] Registered courses safaltapoorvak fetch ho gaye.");
+        console.log("[SUCCESS] Successfully fetched registered courses.");
         
-        // CyberVidya se mila poora data frontend ko bhej dein
         res.json({
             success: true,
             data: responseBody,
         });
 
     } catch (error) {
-        const errorMessage = error.message || "Registered courses fetch karne ke dauraan ek anjaan error aayi.";
-        console.error("❌ ERROR /get-registered-courses mein:", errorMessage);
+        const errorMessage = error.message || "An unknown error occurred while fetching registered courses.";
+        console.error("❌ ERROR in /get-registered-courses:", errorMessage);
         res.status(500).json({ success: false, error: errorMessage });
     }
 });
 
-
-// router.post("/get-upcoming-classes", async (req, res) => {
-//     try {
-//         const { authorization } = req.headers;
-
-//         if (!authorization) {
-//             return res.status(400).json({
-//                 success: false,
-//                 error: "Authorization token zaroori hai",
-//             });
-//         }
-        
-//         console.log("[INFO] Upcoming classes ka data fetch kiya ja raha hai...");
-
-//         // Aapke dwara diya gaya naya URL
-//         const upcomingClassesUrl = "https://kiet.cybervidya.net/api/student/dashboard/upcoming/classes";
-
-//         const classesResponse = await gotScraping({
-//             url: upcomingClassesUrl,
-//             method: 'GET',
-//             headers: {
-//                 'Authorization': authorization, // Auth token header mein bhejein
-//             },
-//             responseType: 'json',
-//             throwHttpErrors: false,
-//         });
-        
-//         const responseBody = classesResponse.body;
-
-//         if (classesResponse.statusCode !== 200) {
-//             const errorMessage = responseBody?.message || "Upcoming classes fetch nahi ho saki. Token invalid ya expire ho sakta hai.";
-//             console.error(`[ERROR] Upcoming classes fetch karne mein galti: ${errorMessage}`);
-//             return res.status(classesResponse.statusCode).json({ success: false, error: errorMessage });
-//         }
-        
-//         console.log("[SUCCESS] Upcoming classes safaltapoorvak fetch ho gayi.");
-        
-//         // CyberVidya se mila poora data frontend ko bhej dein
-//         res.json({
-//             success: true,
-//             data: responseBody,
-//         });
-
-//     } catch (error) {
-//         const errorMessage = error.message || "Upcoming classes fetch karne ke dauraan ek anjaan error aayi.";
-//         console.error("❌ ERROR /get-upcoming-classes mein:", errorMessage);
-//         res.status(500).json({ success: false, error: errorMessage });
-//     }
-// });
-
-// Backend route file (e.g., server.js ya apiRoutes.js)
-
-// Helper function to get dates in YYYY-MM-DD format (yeh same rahega)
 const getFormattedDate = (date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -112,20 +56,18 @@ const getFormattedDate = (date) => {
     return `${year}-${month}-${day}`;
 };
 
-// Puraane "/get-weekly-schedule" route ko isse replace karein
 router.post("/get-weekly-schedule", async (req, res) => {
     try {
         const { authorization } = req.headers;
         if (!authorization) {
-            return res.status(400).json({ success: false, error: "Authorization token zaroori hai" });
+            return res.status(400).json({ success: false, error: "Authorization token is required" });
         }
         
-        console.log("[INFO] Agle 7 din ka schedule fetch kiya ja raha hai...");
-
-        // ✅ NAYA LOGIC: Aaj se agle 6 din ki date nikaalein
+        console.log("[INFO] Fetching schedule for the next 7 days...");
+        
         const startDateObj = new Date();
         const endDateObj = new Date();
-        endDateObj.setDate(startDateObj.getDate() + 6); // Aaj + 6 din
+        endDateObj.setDate(startDateObj.getDate() + 6);
 
         const weekStartDate = getFormattedDate(startDateObj);
         const weekEndDate = getFormattedDate(endDateObj);
@@ -145,18 +87,18 @@ router.post("/get-weekly-schedule", async (req, res) => {
         const responseBody = scheduleResponse.body;
 
         if (scheduleResponse.statusCode !== 200) {
-            throw new Error(responseBody?.message || "Weekly schedule fetch nahi ho saka.");
+            throw new Error(responseBody?.message || "Failed to fetch weekly schedule.");
         }
-        
-        console.log("[SUCCESS] Weekly schedule safaltapoorvak fetch ho gaya.");
-        
+
+        console.log("[SUCCESS] Successfully fetched weekly schedule.");
+
         res.json({
             success: true,
             data: responseBody,
         });
 
     } catch (error) {
-        console.error("❌ ERROR /get-weekly-schedule mein:", error.message);
+        console.error("❌ ERROR in /get-weekly-schedule:", error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -168,11 +110,11 @@ router.post("/get-dashboard-attendance", async (req, res) => {
         if (!authorization) {
             return res.status(400).json({
                 success: false,
-                error: "Authorization token zaroori hai",
+                error: "Authorization token is required",
             });
         }
         
-        console.log("[INFO] Dashboard attendance ka data fetch kiya ja raha hai...");
+        console.log("[INFO] Fetching dashboard attendance data...");
 
         const dashboardAttendanceUrl = "https://kiet.cybervidya.net/api/student/dashboard/attendance";
 
@@ -189,12 +131,12 @@ router.post("/get-dashboard-attendance", async (req, res) => {
         const responseBody = attendanceResponse.body;
 
         if (attendanceResponse.statusCode !== 200) {
-            const errorMessage = responseBody?.message || "Dashboard attendance fetch nahi ho saki. Token invalid ya expire ho sakta hai.";
-            console.error(`[ERROR] Dashboard attendance fetch karne mein galti: ${errorMessage}`);
+            const errorMessage = responseBody?.message || "Could not fetch dashboard attendance. Token might be invalid or expired.";
+            console.error(`[ERROR] Error fetching dashboard attendance: ${errorMessage}`);
             return res.status(attendanceResponse.statusCode).json({ success: false, error: errorMessage });
         }
         
-        console.log("[SUCCESS] Dashboard attendance  dashboard se aayaa hai");
+        console.log("[SUCCESS] Successfully fetched dashboard attendance.");
         
         res.json({
             success: true,
@@ -202,19 +144,19 @@ router.post("/get-dashboard-attendance", async (req, res) => {
         });
 
     } catch (error) {
-        const errorMessage = error.message || "Dashboard attendance fetch karne ke dauraan ek anjaan error aayi.";
-        console.error("❌ ERROR /get-dashboard-attendance mein:", errorMessage);
+        const errorMessage = error.message || "An unknown error occurred while fetching dashboard attendance.";
+        console.error("❌ ERROR in /get-dashboard-attendance:", errorMessage);
         res.status(500).json({ success: false, error: errorMessage });
     }
 });
 
 router.post("/get-detailed-attendance", async (req, res) => {
     try {
-        const { authorization } = req.headers; // <-- BODY SE HEADERS KIYA GAYA
+        const { authorization } = req.headers;
         if (!authorization) {
-            return res.status(400).json({ success: false, error: "Authorization header zaroori hai" });
+            return res.status(400).json({ success: false, error: "Authorization header is required" });
         }
-        console.log("[INFO] Detailed attendance data fetch kiya ja raha hai...");
+        console.log("[INFO] Fetching detailed attendance data...");
         const attendanceUrl = "https://kiet.cybervidya.net/api/attendance/course/component/student";
         const attendanceResponse = await gotScraping({
             url: attendanceUrl,
@@ -225,9 +167,9 @@ router.post("/get-detailed-attendance", async (req, res) => {
         });
         const responseBody = attendanceResponse.body;
         if (attendanceResponse.statusCode !== 200) {
-            throw new Error(responseBody?.message || "Detailed attendance fetch nahi ho saki.");
+            throw new Error(responseBody?.message || "Could not fetch detailed attendance.");
         }
-        console.log("[SUCCESS] Detailed attendance attendence se aaay ahai .");
+        console.log("[SUCCESS] Successfully fetched detailed attendance.");
         res.json({ success: true, data: responseBody });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
@@ -238,29 +180,28 @@ router.post("/get-lecture-wise-attendance", async (req, res) => {
     try {
         
         const {authorization} = req.headers;
-        const {  studentId, courseId, courseCompId } = req.body;
+        const { studentId, courseId, courseCompId } = req.body;
 
         if (!authorization || !studentId || !courseId || !courseCompId) {
             return res.status(400).json({
                 success: false,
-                error: "Authorization, studentId, courseId, aur courseCompId zaroori hai",
+                error: "Authorization, studentId, courseId, and courseCompId are required",
             });
         }
         
-        console.log(`[INFO] Lecture-wise attendance fetch ki ja rahi hai courseId: ${courseId} ke liye...`);
+        console.log(`[INFO] Fetching lecture-wise attendance for courseId: ${courseId}...`);
 
         const lectureWiseUrl = "https://kiet.cybervidya.net/api/attendance/schedule/student/course/attendance/percentage";
 
         const lectureResponse = await gotScraping({
             url: lectureWiseUrl,
-            method: 'POST', // Yeh ek POST request hai
+            method: 'POST',
             headers: {
                 'Authorization': authorization,
             },
-            // Body mein JSON payload bhejein
             json: {
                 studentId: studentId,
-                sessionId: null, // Default null bhej rahe hain
+                sessionId: null,
                 courseId: courseId,
                 courseCompId: courseCompId
             },
@@ -271,12 +212,12 @@ router.post("/get-lecture-wise-attendance", async (req, res) => {
         const responseBody = lectureResponse.body;
 
         if (lectureResponse.statusCode !== 200) {
-            const errorMessage = responseBody?.message || "Lecture-wise attendance fetch nahi ho saki.";
-            console.error(`[ERROR] Lecture-wise attendance fetch karne mein galti: ${errorMessage}`);
+            const errorMessage = responseBody?.message || "Could not fetch lecture-wise attendance.";
+            console.error(`[ERROR] Error fetching lecture-wise attendance: ${errorMessage}`);
             return res.status(lectureResponse.statusCode).json({ success: false, error: errorMessage });
         }
         
-        console.log("[SUCCESS] Lecture-wise attendance safaltapoorvak fetch ho gayi.");
+        console.log("[SUCCESS] Successfully fetched lecture-wise attendance.");
         
         res.json({
             success: true,
@@ -284,10 +225,10 @@ router.post("/get-lecture-wise-attendance", async (req, res) => {
         });
 
     } catch (error) {
-        const errorMessage = error.message || "Lecture-wise attendance fetch karne ke dauraan ek anjaan error aayi.";
-        console.error("❌ ERROR /get-lecture-wise-attendance mein:", errorMessage);
+        const errorMessage = error.message || "An unknown error occurred while fetching lecture-wise attendance.";
+        console.error("❌ ERROR in /get-lecture-wise-attendance:", errorMessage);
         res.status(500).json({ success: false, error: errorMessage });
     }
 });
-
+//here we end 
 export default router;
