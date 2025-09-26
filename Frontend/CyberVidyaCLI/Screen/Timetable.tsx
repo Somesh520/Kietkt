@@ -4,10 +4,11 @@ import {
   Text,
   StyleSheet,
   SectionList,
-  SafeAreaView,
   Animated,
   ScrollView,
 } from 'react-native';
+// ✅ YEH ASLI FIX HAI: SafeAreaView ko 'react-native-safe-area-context' se import karna hai
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { getWeeklySchedule, TimetableEvent } from '../api';
 import Icon from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
@@ -238,3 +239,4 @@ const itemStyles = StyleSheet.create({
 });
 
 export default TimetableScreen;
+

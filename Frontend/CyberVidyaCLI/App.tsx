@@ -1,82 +1,88 @@
 import React, { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, StatusBar } from 'react-native';
 
-// ✅ Navigation imports updated for Stack Navigator
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 
 import LoginPage from './Screen/Login';
 import HomeScreen from './Screen/Home';
-import ProfileScreen from './Screen/profilescreen'; 
+import ProfileScreen from './Screen/profilescreen';
 import TimetableScreen from './Screen/Timetable';
-import CourseDetailsScreen from './Screen/CourseDetailsScreen'; 
+import CourseDetailsScreen from './Screen/CourseDetailsScreen';
 import { logout } from './api';
 import Icon from 'react-native-vector-icons/Ionicons';
 
 const AUTH_TOKEN_KEY = 'authToken';
 
 const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator(); // ✅ Initialize Stack Navigator
+const Stack = createStackNavigator();
 
-// This component defines your bottom tabs
-function MainAppTabs({ onLogout }: { onLogout: () => void }) {
+type AuthProps = {
+  onLogout: () => void;
+};
+
+function MainAppTabs({ onLogout }: AuthProps) {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        // Function to set icons for each tab
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName = '';
+          let iconName: string = '';
           if (route.name === 'Home') {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Timetable') {
             iconName = focused ? 'calendar' : 'calendar-outline';
-          } else if (route.name === 'About us') { // ✅ Corrected from 'Profile' to 'About us'
+          } else if (route.name === 'About us') {
             iconName = focused ? 'person-circle' : 'person-circle-outline';
           }
           return <Icon name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#2980b9',
         tabBarInactiveTintColor: 'gray',
-        headerShown: false, // We hide the default header for tab screens
-        tabBarStyle: { paddingBottom: 5, paddingTop: 5, height: 60 },
+        headerShown: false,
+        tabBarStyle: { height: 60, paddingBottom: 5, paddingTop: 5, borderTopWidth: 0, elevation: 5, backgroundColor: '#ffffff' },
         tabBarLabelStyle: { fontSize: 12 },
+        tabBarHideOnKeyboard: true,
       })}
     >
-      <Tab.Screen 
+      <Tab.Screen
         name="Home"
         children={() => <HomeScreen onLogout={onLogout} />}
       />
-      <Tab.Screen name="Timetable" component={TimetableScreen} />
-      <Tab.Screen name="About us" component={ProfileScreen} />
+      <Tab.Screen
+        name="Timetable"
+        component={TimetableScreen}
+      />
+      <Tab.Screen
+        name="About us"
+        component={ProfileScreen}
+      />
     </Tab.Navigator>
   );
 }
 
-// ✅ This is the main navigator for your app after login
-// It contains both the Tab Navigator and any other screens you want to navigate to
-function AppStack({ onLogout }: { onLogout: () => void }) {
+function AppStack({ onLogout }: AuthProps) {
   return (
     <Stack.Navigator>
-      <Stack.Screen 
-        name="MainTabs" 
+      <Stack.Screen
+        name="MainTabs"
         children={() => <MainAppTabs onLogout={onLogout} />}
-        options={{ headerShown: false }} // The tabs screen doesn't need its own header
+        options={{ headerShown: false }}
       />
-      <Stack.Screen 
-        name="CourseDetails" 
+      <Stack.Screen
+        name="CourseDetails"
         component={CourseDetailsScreen}
-        options={{ title: 'Lecture Details' }} // This title will show on the details screen
+        options={{ title: 'Lecture Details' }}
       />
     </Stack.Navigator>
   );
 }
 
-// Main App Component
 function App(): React.JSX.Element {
   const [authToken, setAuthToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const checkToken = async () => {
@@ -91,11 +97,11 @@ function App(): React.JSX.Element {
     setAuthToken(token);
   };
 
-  const handleLogout = async () => {
+  const handleLogout = async (): Promise<void> => {
     await logout();
     setAuthToken(null);
   };
-  
+
   if (isLoading) {
     return (
       <View style={styles.container}>
@@ -105,23 +111,32 @@ function App(): React.JSX.Element {
   }
 
   return (
-    <NavigationContainer>
-        {authToken ? (
-            // ✅ After login, we now render the Stack Navigator
+    <SafeAreaProvider>
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+      <NavigationContainer>
+        <SafeAreaView style={styles.safeArea}>
+          {authToken ? (
             <AppStack onLogout={handleLogout} />
-        ) : (
+          ) : (
             <LoginPage onLoginSuccess={handleLoginSuccess} />
-        )}
-    </NavigationContainer>
+          )}
+        </SafeAreaView>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  safeArea: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
 });
 
 export default App;
+

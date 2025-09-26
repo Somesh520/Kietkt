@@ -3,11 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   Linking,
   ScrollView,
 } from 'react-native';
+// ✅ Yeh bilkul sahi import hai!
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
@@ -36,7 +37,6 @@ function ProfileScreen(): React.JSX.Element {
     Linking.openURL(url).catch(err => console.error("Couldn't load page", err));
   };
 
-  // Simple fade-in animation for the whole screen content
   const opacity = useSharedValue(0);
   const animatedContainerStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -111,7 +111,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f2f2f7',
   },
   container: {
-    padding: 20,
+    // ✅ Chota sa sudhaar: Neeche thodi extra padding, taaki content tab bar se na chipke
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40, // Pehle yeh 20 tha
   },
   headerTitle: {
     fontSize: 34,
@@ -151,20 +154,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#e5e5ea',
     marginLeft: 56,
   },
-  // New styles for the info box
   infoItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start', // Align icon to the top of the text
+    alignItems: 'flex-start',
     padding: 16,
   },
   infoText: {
     flex: 1,
     marginLeft: 16,
     fontSize: 16,
-    color: '#6e6e73', // Using a secondary text color
-    lineHeight: 22, // Improves readability
+    color: '#6e6e73',
+    lineHeight: 22,
   },
 });
 
 export default ProfileScreen;
-

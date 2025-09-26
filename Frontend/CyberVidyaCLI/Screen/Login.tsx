@@ -19,6 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { login } from '../api';
 import Icon from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
+import axios from 'axios'; // ✅ Axios ko import karein
 
 const USER_CREDENTIALS_KEY = 'userCredentials';
 const REMEMBER_ME_KEY = 'rememberMe';
@@ -33,7 +34,7 @@ const CustomCheckbox = ({ isChecked, onCheck, children }: any) => (
   </Pressable>
 );
 
-const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
+const LoginPage = ({ onLoginSuccess }: { onLoginSuccess: (token: string) => void; }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -81,7 +82,6 @@ const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
     try {
       const token = await login(username, password);
 
-      // ✅ SAHI LOGIC YAHAN HAI
       if (rememberMe) {
         await AsyncStorage.setItem(REMEMBER_ME_KEY, 'true');
         await AsyncStorage.setItem(USER_CREDENTIALS_KEY, JSON.stringify({ username, password }));
@@ -91,7 +91,15 @@ const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
       }
       onLoginSuccess(token);
     } catch (err: any) {
-      setError(err.message || 'Login failed. Please check your credentials.');
+      // ✅ Yahan badlav kiya gaya hai
+      // Ab yeh backend se aa rahe 'error' message ko padhega
+      if (axios.isAxiosError(err) && err.response) {
+        // Agar server se error message aaya hai, toh use dikhayein
+        setError(err.response.data.error || 'An error occurred.');
+      } else {
+        // Agar network ya koi aur error hai
+        setError(err.message || 'Login failed. Please check your credentials.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -109,7 +117,7 @@ const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
         >
           <ScrollView contentContainerStyle={styles.scrollContainer}>
             <Animated.Image
-              source={{ uri: 'https://placehold.co/150x150/2c3e50/FFFFFF?text=Bb' }}
+              source={{ uri: 'https://placehold.co/150x150/2c3e50/FFFFFF?text=B' }} // Changed text to B
               style={[styles.logo, { opacity: fadeAnim }]}
             />
             <Animated.Text style={[styles.title, { opacity: fadeAnim }]}>
@@ -119,7 +127,7 @@ const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
               Sign in to continue
             </Animated.Text>
             <Animated.Text style={[styles.instructions, { opacity: fadeAnim }]}>
-              Use your official KIET CyberVidhya credentials.
+              Use your official KIET CyberVidya credentials.
             </Animated.Text>
 
             <View>
@@ -127,11 +135,11 @@ const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
                 <Icon name="person-outline" size={22} color="#7f8c8d" style={styles.icon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="University Roll Number"
+                  placeholder="Cybervidya Username"
                   placeholderTextColor="#7f8c8d"
                   value={username}
                   onChangeText={setUsername}
-                  keyboardType="numeric"
+                  keyboardType="default"
                   autoCapitalize="none"
                 />
               </View>
@@ -139,7 +147,7 @@ const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
                 <Icon name="lock-closed-outline" size={22} color="#7f8c8d" style={styles.icon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Password"
+                  placeholder="Cybervidya Password"
                   placeholderTextColor="#7f8c8d"
                   value={password}
                   onChangeText={setPassword}

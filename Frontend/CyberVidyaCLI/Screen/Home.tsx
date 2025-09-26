@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   Pressable,
   FlatList,
@@ -12,6 +11,7 @@ import {
   Platform,
   UIManager,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import {
   getAttendanceAndDetails,
@@ -24,7 +24,6 @@ import {
 import { CircularProgress } from 'react-native-circular-progress';
 import Icon from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
-// NEW: Import animation libraries
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay } from 'react-native-reanimated';
 import { createShimmerPlaceholder } from 'react-native-shimmer-placeholder';
 
@@ -34,12 +33,24 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// --- Helper Functions (No changes here) ---
+// --- Helper Functions (No changes) ---
 const getGreeting = (): string => {
-  const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) return "Good Morning,";
-  if (hour >= 12 && hour < 18) return "Good Afternoon,";
-  return "Good Evening,";
+  const hour = new Date().getHours(); // Yeh 0 se 23 tak ka number dega
+
+  if (hour >= 5 && hour < 12) {
+    // Subah 5 baje se 11:59 AM tak
+    return "Good Morning,";
+  }
+  if (hour >= 12 && hour < 18) {
+    // Dopehar 12 baje se 5:59 PM tak
+    return "Good Afternoon,";
+  }
+  if (hour >= 18 && hour < 22) {
+    // Shaam 6 baje se 9:59 PM tak
+    return "Good Evening,";
+  }
+  // Baaki saara samay (Raat 10 baje se subah 4:59 AM tak)
+  return "Good Night,";
 };
 
 const getAttendanceInfo = (present: number, total: number) => {
@@ -58,10 +69,11 @@ const getAttendanceInfo = (present: number, total: number) => {
   }
 };
 
-// --- UI Components (No changes to SmartSummary) ---
+// --- UI Components ---
 const SmartSummary = ({ present, total }: { present: number, total: number }) => {
-    // ... (This component remains exactly the same as in your original code)
+    // ✅ FIX: getAttendanceInfo ko pehle call kiya taaki 'message' variable available ho
     const { status, message } = getAttendanceInfo(present, total);
+
     if (total === 0) {
       return (
         <View style={styles.summaryBox}>
@@ -73,6 +85,7 @@ const SmartSummary = ({ present, total }: { present: number, total: number }) =>
         </View>
       );
     }
+    
     if (status === 'safe') {
       const canMiss = Math.floor(present / 0.75 - total);
       return (
@@ -101,28 +114,23 @@ const SmartSummary = ({ present, total }: { present: number, total: number }) =>
     }
 };
 
-// MODIFIED: Wrapped AttendanceCard in an Animated component for staggered entry
 const AnimatedAttendanceCard = ({ item, index }: { item: RegisteredCourse, index: number }) => {
   const navigation = useNavigation<any>();
   const { courseName, courseId, studentId, studentCourseCompDetails } = item;
   const details = studentCourseCompDetails?.[0];
 
-  // Animation values
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(20);
 
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      opacity: opacity.value,
-      transform: [{ translateY: translateY.value }],
-    };
-  });
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
 
   useEffect(() => {
-    // Staggered animation with a delay based on the item's index
     opacity.value = withDelay(index * 100, withTiming(1, { duration: 400 }));
     translateY.value = withDelay(index * 100, withTiming(0, { duration: 400 }));
-  }, []);
+  }, [index, opacity, translateY]);
 
   if (!details) return null;
 
@@ -161,29 +169,45 @@ const AnimatedAttendanceCard = ({ item, index }: { item: RegisteredCourse, index
   );
 };
 
-// NEW: Skeleton loader component
 const SkeletonPlaceholderComponent = () => (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 10 }}>
-        {/* Header Skeleton */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 }}>
-            <View>
-                <ShimmerPlaceholder style={{ width: 150, height: 20, borderRadius: 5, marginBottom: 8 }} />
-                <ShimmerPlaceholder style={{ width: 120, height: 30, borderRadius: 5 }} />
-            </View>
-            <ShimmerPlaceholder style={{ width: 80, height: 38, borderRadius: 20 }} />
-        </View>
-        {/* Details Card Skeleton */}
-        <ShimmerPlaceholder style={[styles.detailCard, { height: 140, padding: 0 }]} />
-        {/* Overall Summary Skeleton */}
-        <ShimmerPlaceholder style={[styles.card, { height: 180, marginBottom: 24 }]} />
-        {/* Subject Cards Skeleton */}
-        <ShimmerPlaceholder style={[styles.card, { height: 230 }]} />
-        <ShimmerPlaceholder style={[styles.card, { height: 230, marginTop: -6 }]} />
+    <View style={{ paddingHorizontal: 16, paddingTop: 10 }}>
+      {/* Header Skeleton */}
+      <View style={styles.header}>
+          <View>
+              <ShimmerPlaceholder style={{ width: 150, height: 20, borderRadius: 5, marginBottom: 8 }} />
+              <ShimmerPlaceholder style={{ width: 120, height: 30, borderRadius: 5 }} />
+          </View>
+          <ShimmerPlaceholder style={{ width: 80, height: 38, borderRadius: 20 }} />
       </View>
-    </SafeAreaView>
-);
+      
+      {/* Details Card Skeleton */}
+      <View style={[styles.detailCard, {padding: 10}]}>
+          <ShimmerPlaceholder style={{width: '90%', height: 20, borderRadius: 5, marginVertical: 12}} />
+          <ShimmerPlaceholder style={{width: '80%', height: 20, borderRadius: 5, marginVertical: 12}} />
+          <ShimmerPlaceholder style={{width: '85%', height: 20, borderRadius: 5, marginVertical: 12}} />
+      </View>
 
+      {/* Overall Summary Skeleton */}
+      <View style={[styles.card, { padding: 20 }]}>
+          <ShimmerPlaceholder style={[styles.listHeader, { width: '70%', height: 22, marginBottom: 20 }]} />
+          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+              <ShimmerPlaceholder style={{ width: 120, height: 120, borderRadius: 60 }} />
+              <View style={{flex: 1, marginLeft: 20}}>
+                  <ShimmerPlaceholder style={{ width: '90%', height: 20, borderRadius: 5 }} />
+                  <ShimmerPlaceholder style={{ width: '70%', height: 16, borderRadius: 5, marginTop: 10 }} />
+              </View>
+          </View>
+      </View>
+
+      {/* Subject Breakdown Skeleton */}
+      <ShimmerPlaceholder style={[styles.listHeader, { width: '80%', height: 22 }]} />
+      <View style={[styles.card, { padding: 20 }]}>
+          <ShimmerPlaceholder style={{width: '60%', height: 18, borderRadius: 5}}/>
+          <ShimmerPlaceholder style={{width: '40%', height: 15, borderRadius: 5, marginTop: 8}}/>
+          <ShimmerPlaceholder style={{width: '100%', height: 8, borderRadius: 4, marginTop: 15}}/>
+      </View>
+    </View>
+);
 
 // --- Main Screen Component ---
 function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
@@ -196,7 +220,9 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
 
   const fetchAllData = useCallback(async () => {
     try {
-      if (!refreshing) setLoading(true);
+      if (!refreshing) {
+        setLoading(true);
+      }
       setError(null);
       const [details, dashboard, registeredCourses] = await Promise.all([
         getAttendanceAndDetails(),
@@ -216,27 +242,28 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
 
   useEffect(() => {
     fetchAllData();
-  }, [fetchAllData]); // REMOVED: LayoutAnimation from here
+  }, [fetchAllData]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    // NEW: We re-trigger fetchAllData directly on refresh
-    fetchAllData();
   }, []);
 
-  // MODIFIED: Show skeleton loader instead of ActivityIndicator
   if (loading && !refreshing) {
-    return <SkeletonPlaceholderComponent />;
+    return (
+        <SafeAreaView style={styles.safeArea}>
+            <SkeletonPlaceholderComponent />
+        </SafeAreaView>
+    );
   }
 
-  if (error) {
+  if (error && !loading) {
     return (
-      <View style={styles.centerContainer}>
+      <SafeAreaView style={styles.centerContainer}>
         <Text style={styles.errorText}>{error}</Text>
-        <Button title="Refresh" onPress={fetchAllData} color="#2980b9" />
+        <Button title="Try Again" onPress={fetchAllData} color="#2980b9" />
         <View style={{ marginTop: 10 }} />
         <Button title="Logout" onPress={onLogout} color="#c0392b" />
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -282,10 +309,9 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <LinearGradient colors={['#e7f2f8', '#f4f6f8']} style={{ flex: 1 }}>
+      <LinearGradient colors={['#e7f2f8', '#f4f6f8', '#f4f6f8']} style={{ flex: 1 }}>
         <FlatList
           data={courses}
-          // MODIFIED: Use the new animated component and pass the index
           renderItem={({ item, index }) => <AnimatedAttendanceCard item={item} index={index} />}
           keyExtractor={(item) => item.courseId.toString()}
           ListHeaderComponent={ListHeader}
@@ -298,11 +324,11 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
   );
 }
 
-// Styles (No changes needed here, they work well with the new components)
+// --- Styles ---
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: '#e7f2f8' },
-    headerContainer: { paddingTop: 10 },
-    centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f4f6f8' },
+    headerContainer: { /* paddingTop: 10 --- Isko hata diya */ },
+    centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f4f6f8', padding: 20 },
     errorText: { color: '#c0392b', textAlign: 'center', marginBottom: 20, fontSize: 16 },
     header: { paddingVertical: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     greeting: { fontSize: 20, color: '#7f8c8d' },
@@ -341,3 +367,4 @@ const styles = StyleSheet.create({
   });
 
 export default HomeScreen;
+
