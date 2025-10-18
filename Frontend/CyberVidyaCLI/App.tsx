@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+// import AsyncStorage from '@react--native-async-storage/async-storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, ActivityIndicator, StyleSheet, StatusBar } from 'react-native';
 
@@ -12,6 +13,7 @@ import HomeScreen from './Screen/Home';
 import ProfileScreen from './Screen/profilescreen';
 import TimetableScreen from './Screen/Timetable';
 import CourseDetailsScreen from './Screen/CourseDetailsScreen';
+import ExamScheduleScreen from './Screen/Exams'; // Exam screen ko import karein
 import { logout } from './api';
 import Icon from 'react-native-vector-icons/Ionicons';
 
@@ -34,6 +36,8 @@ function MainAppTabs({ onLogout }: AuthProps) {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Timetable') {
             iconName = focused ? 'calendar' : 'calendar-outline';
+          } else if (route.name === 'Exams') { // Exam tab ke liye icon
+            iconName = focused ? 'school' : 'school-outline';
           } else if (route.name === 'About us') {
             iconName = focused ? 'person-circle' : 'person-circle-outline';
           }
@@ -54,6 +58,11 @@ function MainAppTabs({ onLogout }: AuthProps) {
       <Tab.Screen
         name="Timetable"
         component={TimetableScreen}
+      />
+      {/* Naya Exam Screen Tab */}
+      <Tab.Screen
+        name="Exams"
+        component={ExamScheduleScreen}
       />
       <Tab.Screen
         name="About us"
