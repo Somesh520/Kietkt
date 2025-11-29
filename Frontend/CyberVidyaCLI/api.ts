@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { InternalAxiosRequestConfig, AxiosHeaderValue } from 'axios';
+import RNBlobUtil from 'react-native-blob-util'; // ✅ Required for PDF Download
+import { Platform } from 'react-native';
 
 // Base URL ab seedhe Cyber Vidhya ka hai
 const API_BASE_URL = "https://kiet.cybervidya.net/api";
@@ -7,13 +9,13 @@ const AUTH_TOKEN_KEY = 'authToken';
 const USER_CREDENTIALS_KEY = 'userCredentials';
 
 // Rate Limiting Constants
-const MAX_LOGIN_ATTEMPTS = 5; // CyberVidhya 5 attempts deta hai, so keeping it 5
-const LOCKOUT_DURATION_MINUTES = 5; // Standard lockout time
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MINUTES = 5;
 const LOGIN_ATTEMPTS_KEY = 'loginAttempts';
 const LOCKOUT_TIMESTAMP_KEY = 'lockoutTimestamp';
 
 
-// --- Interfaces (No changes needed) ---
+// --- Interfaces ---
 export interface UserDetails {
   fullName: string;
   registrationNumber: string;
@@ -22,18 +24,22 @@ export interface UserDetails {
   degreeName: string;
   semesterName: string;
   admissionBatchName: string;
+  studentId?: number; // Added optional studentId if available in login response
   attendanceCourseComponentInfoList: any[];
 }
+
 export interface ApiResponse<T> {
     success: boolean;
     data: T;
     error?: string;
-    message?: string; // CyberVidhya 'error' ke bajaye 'message' bhej sakta hai
+    message?: string;
 }
+
 interface LoginApiResponse {
     success: boolean;
     data: {
         token: string;
+        studentId?: number; // Capturing studentId from login if available
     };
     message?: string;
 }
@@ -83,34 +89,45 @@ export interface LectureWiseAttendance {
   percent: number;
   lectureList: Lecture[];
 }
+
 export interface ExamSchedule {
-  strExamDate: string;           // Exam ki date ya date range
-  courseName: string;            // Subject ka naam
-  evalLevelComponentName: string; // Exam ka type (jaise "CA2", "MSE", "Main")
-  courseCode: string;            // Subject code
-  strExamTime: string | null;    // Exam ka time (e.g., "09:00 AM - 12:00 PM")
-  examMode: string;              // "Offline" ya "Online"
-  examVenueName: string;         // Exam center
-  courseComponentName: string;   // "THEORY", "PRACTICAL", etc.
+  strExamDate: string;
+  courseName: string;
+  evalLevelComponentName: string;
+  courseCode: string;
+  strExamTime: string | null;
+  examMode: string;
+  examVenueName: string;
+  courseComponentName: string;
 }
+
+// ✅ NEW INTERFACES FOR HALL TICKET
+export interface ExamSession {
+  sessionId: number;
+  sessionName: string;
+}
+
+export interface HallTicketOption {
+  id: number; // This is the hallTicketId needed for download
+  title: string;
+}
+
+
 // --- API Client and Interceptors ---
 export const apiClient = axios.create({ baseURL: API_BASE_URL });
 
-// Request Interceptor: Debugging ke liye request ko log karta hai
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
     if (token) {
       config.headers['Authorization'] = token as AxiosHeaderValue;
     }
-    // Debugging ke liye: Har request ka URL log karein
     console.log(`[API Request] --> ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
     return config;
   },
   (error: any) => Promise.reject(error)
 );
 
-// Response Interceptor: Token expire hone par automatically naya token fetch karta hai
 apiClient.interceptors.response.use(
   (response: any) => response,
   async (error: any) => {
@@ -132,7 +149,7 @@ apiClient.interceptors.response.use(
               password: password,
           });
 
-          if (data.data?.token) { // Check for token directly
+          if (data.data?.token) {
             console.log('[Token Refresh] Successfully got new token.');
             const newToken = `GlobalEducation ${data.data.token}`;
             await AsyncStorage.setItem(AUTH_TOKEN_KEY, newToken);
@@ -154,10 +171,9 @@ apiClient.interceptors.response.use(
   }
 );
 
-// Helper function to handle and log errors consistently
+// Helper function to handle errors
 const handleError = (error: any, functionName: string): Error => {
     if (axios.isAxiosError(error)) {
-        // Log the full error object for debugging
         console.error(`❌ [API Error] in ${functionName}:`, {
             message: error.message,
             status: error.response?.status,
@@ -165,25 +181,19 @@ const handleError = (error: any, functionName: string): Error => {
             url: error.config?.url,
         });
 
-        // Extract a user-friendly error message string to prevent [object Object]
         let userMessage = 'An API error occurred.';
         if (error.response?.data) {
             const errorData = error.response.data;
-            // Specific path for CyberVidhya login attempt errors
             if (errorData.error && typeof errorData.error.reason === 'string') {
                 userMessage = errorData.error.reason;
-            } 
-            // Generic fallback for other messages
-            else if (typeof errorData.message === 'string') {
+            } else if (typeof errorData.message === 'string') {
                 userMessage = errorData.message;
-            }
-            else {
+            } else {
                  userMessage = `Request failed with status ${error.response.status}`;
             }
         } else {
             userMessage = error.message;
         }
-        
         return new Error(userMessage);
     } else {
         console.error(`❌ [Non-API Error] in ${functionName}:`, error.message);
@@ -192,10 +202,9 @@ const handleError = (error: any, functionName: string): Error => {
 };
 
 
-// --- API Functions (Updated with Rate Limiting) ---
+// --- API Functions ---
 
-export const login = async (username: string, password: string): Promise<string> => {
-    // 1. Check if user is currently locked out
+export const login = async (username: string, password: string): Promise<any> => {
     const lockoutTimestampStr = await AsyncStorage.getItem(LOCKOUT_TIMESTAMP_KEY);
     if (lockoutTimestampStr) {
         const lockoutTimestamp = parseInt(lockoutTimestampStr, 10);
@@ -204,7 +213,6 @@ export const login = async (username: string, password: string): Promise<string>
             const remainingMinutes = Math.ceil((lockoutTimestamp - now) / (60 * 1000));
             throw new Error(`Too many failed attempts. Please try again in ${remainingMinutes} minutes.`);
         } else {
-            // Lockout has expired, clear the stored values
             await AsyncStorage.removeItem(LOCKOUT_TIMESTAMP_KEY);
             await AsyncStorage.removeItem(LOGIN_ATTEMPTS_KEY);
         }
@@ -217,48 +225,47 @@ export const login = async (username: string, password: string): Promise<string>
         });
 
         if (data.data?.token) {
-            // On successful login, reset the attempt counter
             await AsyncStorage.removeItem(LOGIN_ATTEMPTS_KEY);
             
             const authorizationHeader = `GlobalEducation ${data.data.token}`;
             await AsyncStorage.setItem(AUTH_TOKEN_KEY, authorizationHeader);
             await AsyncStorage.setItem(USER_CREDENTIALS_KEY, JSON.stringify({ username, password }));
             
+            // Store Student ID if available (often needed for Hall Ticket)
+            if (data.data.studentId) {
+                await AsyncStorage.setItem('studentId', data.data.studentId.toString());
+            }
+
             apiClient.defaults.headers.common['Authorization'] = authorizationHeader;
-            return authorizationHeader;
+            return data.data; // Return full data object to get studentId
         }
-        // Throw error for login failure which will be caught below
-        // Use the 'reason' field if available for attempt count messages
+        
         const errMsg = (axios.isAxiosError(data) && data.response?.data?.error?.reason) 
                      ? data.response.data.error.reason 
                      : (data.message || 'Login failed due to an unknown error.');
         throw new Error(errMsg);
     } catch (err: any) {
-        // 2. Handle failed login attempt IF it's an Axios error (network/status code error)
          if (axios.isAxiosError(err)) {
             const attemptsStr = await AsyncStorage.getItem(LOGIN_ATTEMPTS_KEY);
             const currentAttempts = attemptsStr ? parseInt(attemptsStr, 10) : 0;
             const newAttempts = currentAttempts + 1;
 
             if (newAttempts >= MAX_LOGIN_ATTEMPTS) {
-                // Lock the user out
                 const lockoutUntil = Date.now() + LOCKOUT_DURATION_MINUTES * 60 * 1000;
                 await AsyncStorage.setItem(LOCKOUT_TIMESTAMP_KEY, lockoutUntil.toString());
-                await AsyncStorage.removeItem(LOGIN_ATTEMPTS_KEY); // Clear attempts on lockout
+                await AsyncStorage.removeItem(LOGIN_ATTEMPTS_KEY);
                 throw new Error(`Too many failed attempts. You are locked out for ${LOCKOUT_DURATION_MINUTES} minutes.`);
             } else {
-                // Save the new attempt count
                 await AsyncStorage.setItem(LOGIN_ATTEMPTS_KEY, newAttempts.toString());
             }
         }
-        
-        // Let the generic handler process and throw the final error
         throw handleError(err, 'login');
     }
 };
 
 export const logout = async () => {
     await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
+    await AsyncStorage.removeItem('studentId');
     delete apiClient.defaults.headers.common['Authorization'];
 };
 
@@ -294,7 +301,6 @@ export const getWeeklySchedule = async (): Promise<TimetableEvent[]> => {
 export const getDashboardAttendance = async (): Promise<DashboardAttendance> => {
     try {
         const response = await apiClient.get<ApiResponse<DashboardAttendance>>('/student/dashboard/attendance');
-        
         if (response.data?.data) {
             return response.data.data;
         } else {
@@ -321,54 +327,37 @@ export const getRegisteredCourses = async (): Promise<RegisteredCourse[]> => {
 export const getAttendanceAndDetails = async (): Promise<UserDetails> => {
     try {
         const response = await apiClient.get<ApiResponse<UserDetails>>('/attendance/course/component/student');
-        
-        // Check if the API call was successful but there's no data payload
         if (response.data?.data) {
             return response.data.data;
         } else {
-            // Log the entire response data for debugging "no data" scenarios
             console.log('[Debug] "getAttendanceAndDetails" received a response without a data payload:', response.data);
-            // Throw an error with the message from the API, or a default one
             throw new Error(response.data.message || "No attendance details found in the API response.");
         }
     } catch (err) {
-        // The handleError function will catch and log Axios errors or the error thrown above
         throw handleError(err, 'getAttendanceAndDetails');
     }
 };
 
-// ******** MODIFIED FUNCTION ********
 export const getLectureWiseAttendance = async (params: { studentId: number; courseId: number; courseCompId: number }): Promise<Lecture[]> => {
     try {
-        // Define the expected response structure directly based on the JSON payload provided
-        // It's an object containing a 'data' array, where the first element holds the 'lectureList'
         interface LectureApiResponse {
-          data: LectureWiseAttendance[]; // Array containing lecture details including lectureList
-          message?: string; // Optional message field
-          // No 'success' flag here
+          data: LectureWiseAttendance[];
+          message?: string;
         }
-
-        // Make the API call expecting the LectureApiResponse structure
         const response = await apiClient.post<LectureApiResponse>(
             '/attendance/schedule/student/course/attendance/percentage', 
             params
         );
         
-        // Check if the nested lectureList array exists within the first element of the 'data' array
         if (response.data?.data?.[0]?.lectureList) {
-            console.log(`[Debug] Found ${response.data.data[0].lectureList.length} lectures for courseCompId: ${params.courseCompId}`);
             return response.data.data[0].lectureList;
         } else {
-            // Log for debugging if the structure is not what we expect or lectureList is empty/missing
-            console.log('[Debug] "getLectureWiseAttendance" did not find lectureList in the expected location within the response:', JSON.stringify(response.data, null, 2));
-            return []; // Return empty array if no lectures are found or data structure is wrong
+            return [];
         }
     } catch (err) {
-        // Let the generic handler log the error details and throw a user-friendly error
         throw handleError(err, 'getLectureWiseAttendance');
     }
 };
-
 
 export const getExamSchedule = async (): Promise<ExamSchedule[]> => {
     try {
@@ -378,13 +367,102 @@ export const getExamSchedule = async (): Promise<ExamSchedule[]> => {
          }
         const response = await apiClient.get<ExamApiResponse>('/exam/schedule/student/exams');
         if (response.data?.data) {
-            console.log(`[Debug] Found ${response.data.data.length} exam schedule entries.`);
             return response.data.data;
         } else {
-             console.log('[Debug] "getExamSchedule" did not find data array in the response:', JSON.stringify(response.data, null, 2));
              return [];
         }
-    } catch (err) {
+    } catch (err: any) {
+        // Updated generic check for Exam schedule to return empty array on 400
+        const errorString = JSON.stringify(err);
+        if (errorString.includes("Exams are not scheduled yet") || errorString.includes("400 BAD_REQUEST0001")) {
+            return [];
+        }
         throw handleError(err, 'getExamSchedule');
+    }
+};
+
+// ==========================================
+// ✅ HALL TICKET DOWNLOAD FUNCTIONS (NEW)
+// ==========================================
+
+// 1. Get Exam Session ID
+export const getExamSession = async (studentId: string | number): Promise<ExamSession[]> => {
+    try {
+        interface SessionApiResponse {
+            data: ExamSession[];
+        }
+        const response = await apiClient.get<SessionApiResponse>(`/exam/form/session/config/getById/student/${studentId}`);
+        
+        // ✅ Ab hum poora array return karenge, sirf pehla item nahi
+        if (response.data?.data) {
+            return response.data.data; 
+        }
+        return [];
+    } catch (err) {
+        throw handleError(err, 'getExamSession');
+    }
+};
+
+// 2. Get Hall Ticket Options (e.g., MSE2 HALL TICKET)
+export const getHallTicketOptions = async (sessionId: number): Promise<HallTicketOption[]> => {
+    try {
+        interface OptionsApiResponse {
+            data: HallTicketOption[];
+        }
+        // URL from your prompt: /exam/hall-ticket/student/download/options/6
+        const response = await apiClient.get<OptionsApiResponse>(`/exam/hall-ticket/student/download/options/${sessionId}`);
+        
+        if (response.data?.data) {
+            return response.data.data;
+        }
+        return [];
+    } catch (err) {
+        throw handleError(err, 'getHallTicketOptions');
+    }
+};
+
+// 3. Download the actual PDF
+// Note: Returns the PATH where the file is saved
+export const downloadHallTicketPDF = async (hallTicketId: number, title: string): Promise<string> => {
+    try {
+        // 1. Get Token manually for BlobUtil
+        const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+        if (!token) throw new Error("User not authenticated");
+
+        // 2. Prepare Path
+        const { dirs } = RNBlobUtil.fs;
+        const cleanTitle = title.replace(/[^a-zA-Z0-9]/g, '_'); // Remove spaces/special chars
+        const fileName = `${cleanTitle}.pdf`;
+        const filePath = Platform.OS === 'ios' 
+            ? `${dirs.DocumentDir}/${fileName}` 
+            : `${dirs.DownloadDir}/${fileName}`;
+
+        // 3. Prepare URL
+        const url = `${API_BASE_URL}/report/pdf/exam/student/hall-ticket/download/${hallTicketId}`;
+
+        console.log(`[Download] Starting download: ${url}`);
+
+        // 4. Use RNBlobUtil to download (Axios alone is bad for file saving)
+        const res = await RNBlobUtil.config({
+            fileCache: true,
+            addAndroidDownloads: {
+                useDownloadManager: true, // Show in Android notification bar
+                notification: true,
+                path: filePath,
+                description: 'Downloading Hall Ticket...',
+                mime: 'application/pdf',
+                mediaScannable: true,
+            },
+            path: filePath, // iOS path
+        }).fetch('GET', url, {
+            'Authorization': token, // Pass the auth token header
+        });
+
+        console.log(`[Download] Success. Path: ${res.path()}`);
+        return res.path();
+
+    } catch (err: any) {
+        console.error("Download Error:", err);
+        throw new Error(err.message || "Failed to download Hall Ticket PDF");
     }
 };

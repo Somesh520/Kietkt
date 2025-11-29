@@ -1,25 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, SafeAreaView, RefreshControl, Animated } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  SafeAreaView, 
+  RefreshControl, 
+  Animated, 
+  Easing 
+} from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { getExamSchedule, ExamSchedule } from '../api'; // Path ko apne project ke hisab se theek karein
+import { getExamSchedule, ExamSchedule } from '../api';
 
 // --- Skeleton Component ---
 const SkeletonCard = () => {
   const opacity = useRef(new Animated.Value(0.3)).current;
-
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity, {
-          toValue: 0.3,
-          duration: 500,
-          useNativeDriver: true,
-        }),
+        Animated.timing(opacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.3, duration: 500, useNativeDriver: true }),
       ])
     ).start();
   }, [opacity]);
@@ -34,6 +34,36 @@ const SkeletonCard = () => {
   );
 };
 
+// --- Animated Empty State Component ---
+const EmptyExamState = () => {
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(floatAnim, { toValue: -20, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(floatAnim, { toValue: 0, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.timing(scaleAnim, { toValue: 1.1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(scaleAnim, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ])
+      ])
+    ).start();
+  }, [floatAnim, scaleAnim]);
+
+  return (
+    <View style={styles.centerContainer}>
+      <Animated.View style={{ transform: [{ translateY: floatAnim }, { scale: scaleAnim }] }}>
+        <Icon name="cafe" size={90} color="#F39C12" />
+      </Animated.View>
+      <Text style={styles.emptyTitle}>No Exams Scheduled!</Text>
+      <Text style={styles.emptySubtitle}>Relax and enjoy your time off. 🎮☕</Text>
+    </View>
+  );
+};
 
 // --- Main Screen Component ---
 const ExamScheduleScreen = () => {
@@ -42,7 +72,6 @@ const ExamScheduleScreen = () => {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  // courseDetails string ko parse karne ke liye function
   const parseCourseDetails = (details: string) => {
     const parts = details.split('-');
     return {
@@ -52,34 +81,50 @@ const ExamScheduleScreen = () => {
     };
   };
 
-  // Date string (DD/MM/YYYY) ko JavaScript Date object mein convert karne ke liye function
   const parseDate = (dateString: string): Date => {
       const [day, month, year] = dateString.split('/').map(Number);
-      // Month is 0-indexed in JavaScript Date
       return new Date(year, month - 1, day);
   };
 
-
+  // ✅ THIS FUNCTION IS FIXED TO HANDLE YOUR SPECIFIC ERROR
   const fetchExams = async () => {
     try {
       setError(null);
       let data = await getExamSchedule();
       
-      // Data ko date ke anusaar sort karein
-      data.sort((a, b) => {
-        // Date range (e.g., "10/11/2025-14/11/2025") se start date nikalein
-        const dateA_str = a.strExamDate.split('-')[0];
-        const dateB_str = b.strExamDate.split('-')[0];
+      if (Array.isArray(data)) {
+        data.sort((a, b) => {
+          const dateA_str = a.strExamDate.split('-')[0];
+          const dateB_str = b.strExamDate.split('-')[0];
+          return parseDate(dateA_str).getTime() - parseDate(dateB_str).getTime();
+        });
+        setExams(data);
+      } else {
+        setExams([]);
+      }
 
-        const dateA = parseDate(dateA_str);
-        const dateB = parseDate(dateB_str);
-
-        return dateA.getTime() - dateB.getTime(); // Chronological order
-      });
-      
-      setExams(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch exam schedule.');
+      // --- ROBUST ERROR CHECKING ---
+      // Hum error ko string mein convert karke check karenge
+      const errorString = JSON.stringify(err);
+      const errorMessage = err.message || '';
+      const apiReason = err?.response?.data?.data?.error?.reason || '';
+
+      // Agar "Exams are not scheduled yet" kahin bhi likha hai, toh ye empty state hai
+      if (
+        errorMessage.includes("Exams are not scheduled yet") ||
+        apiReason.includes("Exams are not scheduled yet") ||
+        errorString.includes("Exams are not scheduled yet") ||
+        errorString.includes("400 BAD_REQUEST0001")
+      ) {
+        // ✅ Ye Error nahi hai, bas list khali hai
+        setExams([]); 
+        setError(null);
+      } else {
+        // ❌ Ye asli error hai
+        console.log("Real Error Caught:", err);
+        setError(apiReason || errorMessage || 'Failed to fetch exam schedule.');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -108,10 +153,13 @@ const ExamScheduleScreen = () => {
     );
   }
 
+  // Error screen sirf tab dikhega jab actual error ho (Network etc.)
   if (error) {
     return (
       <View style={styles.centerContainer}>
-        <Text style={styles.errorText}>⚠️ Error: {error}</Text>
+        <Icon name="alert-circle-outline" size={50} color="#D93025" />
+        <Text style={[styles.errorText, {marginTop: 10}]}>Something went wrong</Text>
+        <Text style={{color: '#777', textAlign: 'center', marginTop: 5}}>{error}</Text>
       </View>
     );
   }
@@ -121,7 +169,7 @@ const ExamScheduleScreen = () => {
       <Text style={styles.headerTitle}>Exam Schedule</Text>
       <FlatList
         data={exams}
-        keyExtractor={(item, index) => `${(item as any).courseDetails || (item as any).courseCode || index}-${index}`}
+        keyExtractor={(item, index) => `${index}-${item.strExamDate}`}
         renderItem={({ item }) => {
           const courseDetailsString = (item as any).courseDetails;
           
@@ -151,15 +199,13 @@ const ExamScheduleScreen = () => {
             </View>
           );
         }}
-        ListEmptyComponent={
-          <View style={styles.centerContainer}>
-            <Text style={styles.infoText}>No exams scheduled right now. 📅</Text>
-          </View>
-        }
+        // ✅ Empty Component ab sahi se trigger hoga
+        ListEmptyComponent={<EmptyExamState />}
+        
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#4a90e2']} tintColor={'#4a90e2'} />
         }
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20, flexGrow: 1 }}
       />
     </SafeAreaView>
   );
@@ -183,16 +229,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    marginTop: 50,
   },
-  infoText: {
-    marginTop: 15,
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginTop: 20,
+  },
+  emptySubtitle: {
     fontSize: 16,
-    color: '#5A6A7D',
+    color: '#7f8c8d',
+    marginTop: 8,
+    textAlign: 'center',
   },
   errorText: {
     color: '#D93025',
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: 'bold',
     textAlign: 'center',
   },
   card: {
@@ -212,7 +265,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   courseName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1A2533',
     flex: 1,
@@ -255,4 +308,3 @@ const styles = StyleSheet.create({
 });
 
 export default ExamScheduleScreen;
-

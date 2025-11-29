@@ -6,20 +6,32 @@ import {
   SectionList,
   Animated,
   ScrollView,
+  Dimensions,
+  Easing,
+  TouchableOpacity,
+  FlatList,
 } from 'react-native';
-// ✅ YEH ASLI FIX HAI: SafeAreaView ko 'react-native-safe-area-context' se import karna hai
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getWeeklySchedule, TimetableEvent } from '../api';
 import Icon from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 
 // --- Helper Functions ---
-const getTodayDateKey = (): string => {
-  const today = new Date();
-  const day = String(today.getDate()).padStart(2, '0');
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const year = today.getFullYear();
+const formatDateKey = (date: Date): string => {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
   return `${day}/${month}/${year}`;
+};
+
+const getNext7Days = () => {
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    days.push(d);
+  }
+  return days;
 };
 
 const parseCustomDate = (dateString: string): Date => {
@@ -43,12 +55,14 @@ const formatSectionHeaderDate = (dateString: string): string => {
   return date.toLocaleDateString('en-IN', {
     weekday: 'long',
     day: 'numeric',
-    month: 'short',
+    month: 'long',
   });
 };
 
+const getDayName = (date: Date) => date.toLocaleDateString('en-US', { weekday: 'short' });
+const getDayNumber = (date: Date) => date.getDate();
 
-// --- Skeleton Loader Components ---
+// --- Skeleton Loader ---
 const Shimmer = () => {
   const shimmerValue = useRef(new Animated.Value(-1)).current;
   useEffect(() => {
@@ -82,20 +96,15 @@ const Shimmer = () => {
 
 const SkeletonCard = () => (
   <View style={[itemStyles.card, { backgroundColor: '#E0E0E0', overflow: 'hidden' }]}>
-    <View style={itemStyles.timelineContainer}>
-      <View style={[itemStyles.iconContainer, {backgroundColor: '#BDBDBD'}]} />
-    </View>
     <View style={itemStyles.detailsContainer}>
       <View style={{ height: 14, width: '40%', backgroundColor: '#BDBDBD', borderRadius: 4 }} />
       <View style={{ height: 18, width: '80%', backgroundColor: '#BDBDBD', borderRadius: 4, marginTop: 10 }} />
-      <View style={{ height: 14, width: '60%', backgroundColor: '#BDBDBD', borderRadius: 4, marginTop: 10 }} />
     </View>
     <Shimmer />
   </View>
 );
 
-
-// --- Redesigned Card Components ---
+// --- Class Card ---
 const ClassCard = ({ item }: { item: TimetableEvent }) => {
   const startTime = formatTime(parseCustomDate(item.start));
   const endTime = formatTime(parseCustomDate(item.end));
@@ -120,57 +129,149 @@ const ClassCard = ({ item }: { item: TimetableEvent }) => {
   );
 };
 
-const HolidayCard = ({ item }: { item: TimetableEvent }) => (
-  <View style={itemStyles.card}>
-    <View style={itemStyles.timelineContainer}>
-      <View style={[itemStyles.iconContainer, { backgroundColor: '#ffedd5' }]}>
-        <Icon name="cafe-outline" size={20} color="#f97316" />
-      </View>
-      <View style={itemStyles.timelineLine} />
-    </View>
-    <View style={itemStyles.detailsContainer}>
-      <Text style={itemStyles.holidayTitle}>{item.title}</Text>
-      <Text style={itemStyles.holidayContent}>{item.content}</Text>
-    </View>
-  </View>
-);
+// --- 🔥 UPDATED COOL HOLIDAY CARD 🔥 ---
+const HolidayCard = ({ item }: { item: TimetableEvent }) => {
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
 
-// --- Main Screen Component ---
+  useEffect(() => {
+    // 1. Floating Effect (Up and Down)
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -6, // Moves up
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0, // Moves down
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    // 2. Rotating Icon Effect
+    Animated.loop(
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 8000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    ).start();
+  }, []);
+
+  const spin = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <View style={itemStyles.card}>
+      <View style={itemStyles.timelineContainer}>
+        <View style={[itemStyles.iconContainer, { backgroundColor: '#fff7ed', borderWidth: 1, borderColor: '#ffedd5' }]}>
+          <Animated.View style={{ transform: [{ rotate: spin }] }}>
+            <Icon name="sunny" size={22} color="#f97316" />
+          </Animated.View>
+        </View>
+        {/* Dashed Line for Holiday */}
+        <View style={[itemStyles.timelineLine, { backgroundColor: 'transparent', borderStyle: 'dashed', borderWidth: 1, borderColor: '#fed7aa' }]} />
+      </View>
+
+      <Animated.View style={{ flex: 1, transform: [{ translateY: floatAnim }] }}>
+        <LinearGradient
+          colors={['#fff7ed', '#fed7aa']} // Soft Orange Gradient
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={itemStyles.holidayGradientCard}
+        >
+          <View style={{ zIndex: 2 }}>
+            <Text style={itemStyles.holidayLabel}>Relax & Chill</Text>
+            <Text style={itemStyles.holidayTitle}>{item.title}</Text>
+            <Text style={itemStyles.holidayContent}>{item.content || 'Public Holiday'}</Text>
+          </View>
+
+          {/* Background Watermark Icon */}
+          <View style={{ position: 'absolute', right: -10, bottom: -15, opacity: 0.15, zIndex: 1 }}>
+            <Icon name="happy" size={90} color="#c2410c" />
+          </View>
+        </LinearGradient>
+      </Animated.View>
+    </View>
+  );
+};
+
+// --- Empty Schedule State ---
+const EmptyScheduleState = () => {
+  const floatAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, { toValue: -15, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(floatAnim, { toValue: 0, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    ).start();
+  }, [floatAnim]);
+
+  return (
+    <View style={styles.centerContainer}>
+      <Animated.View style={{ transform: [{ translateY: floatAnim }] }}>
+        <Icon name="bed-outline" size={100} color="#BDC3C7" />
+      </Animated.View>
+      <Text style={styles.emptyTextTitle}>No Schedule Found</Text>
+      <Text style={styles.emptyTextSubtitle}>Select another date or enjoy your day!</Text>
+    </View>
+  );
+};
+
+// --- Main Screen ---
 function TimetableScreen(): React.JSX.Element {
+  const [allEvents, setAllEvents] = useState<TimetableEvent[]>([]);
   const [sections, setSections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  const [calendarDays, setCalendarDays] = useState<Date[]>([]);
+  const [selectedDateKey, setSelectedDateKey] = useState<string>(formatDateKey(new Date()));
 
   useEffect(() => {
-    const fetchAndGroupData = async () => {
+    setCalendarDays(getNext7Days());
+    const fetchData = async () => {
       try {
         const weeklyEvents = await getWeeklySchedule();
-        const todayKey = getTodayDateKey();
-        const todaysEvents = weeklyEvents.filter(event => event.start.startsWith(todayKey));
-        todaysEvents.sort((a, b) => parseCustomDate(a.start).getTime() - parseCustomDate(b.start).getTime());
-
-        if (todaysEvents.length > 0) {
-          const sectionsArray = [{ title: todayKey, data: todaysEvents }];
-          setSections(sectionsArray);
-        } else {
-          setSections([]);
-        }
+        setAllEvents(weeklyEvents);
       } catch (e: any) {
         setError(e.message || 'An error occurred.');
       } finally {
         setLoading(false);
       }
     };
-    fetchAndGroupData();
+    fetchData();
   }, []);
+
+  useEffect(() => {
+    if (allEvents.length === 0) return;
+
+    const filteredEvents = allEvents.filter(event => event.start.startsWith(selectedDateKey));
+    filteredEvents.sort((a, b) => parseCustomDate(a.start).getTime() - parseCustomDate(b.start).getTime());
+
+    if (filteredEvents.length > 0) {
+      setSections([{ title: selectedDateKey, data: filteredEvents }]);
+    } else {
+      setSections([]);
+    }
+  }, [selectedDateKey, allEvents]);
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <Text style={styles.mainTitle}>Today's Schedule</Text>
+        <View style={styles.headerContainer}>
+            <Text style={styles.mainTitle}>Schedule</Text>
+        </View>
         <ScrollView contentContainerStyle={styles.listContentContainer} showsVerticalScrollIndicator={false}>
-          <SkeletonCard />
-          <SkeletonCard />
           <SkeletonCard />
           <SkeletonCard />
           <SkeletonCard />
@@ -179,34 +280,54 @@ function TimetableScreen(): React.JSX.Element {
     );
   }
 
-  if (error) {
-    return (
-      <SafeAreaView style={styles.centerContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.headerContainer}>
+        <Text style={styles.mainTitle}>Schedule</Text>
+        <Text style={styles.dateSubtitle}>{formatSectionHeaderDate(selectedDateKey)}</Text>
+      </View>
+
+      <View style={styles.calendarContainer}>
+        <FlatList
+          data={calendarDays}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => item.toString()}
+          contentContainerStyle={{ paddingHorizontal: 15 }}
+          renderItem={({ item }) => {
+            const dateKey = formatDateKey(item);
+            const isSelected = selectedDateKey === dateKey;
+            
+            return (
+              <TouchableOpacity 
+                activeOpacity={0.7}
+                onPress={() => setSelectedDateKey(dateKey)}
+                style={[styles.dateItem, isSelected && styles.dateItemSelected]}
+              >
+                <Text style={[styles.dayText, isSelected && styles.textSelected]}>{getDayName(item)}</Text>
+                <Text style={[styles.dateNumText, isSelected && styles.textSelected]}>{getDayNumber(item)}</Text>
+                {isSelected && <View style={styles.activeDot} />}
+              </TouchableOpacity>
+            );
+          }}
+        />
+      </View>
+
       <SectionList
+        style={{ flex: 1 }} 
         sections={sections}
-        ListHeaderComponent={<Text style={styles.mainTitle}>Today's Schedule</Text>}
         keyExtractor={(item, index) => item.start + index}
         renderItem={({ item }) => {
           if (item.type === 'CLASS') return <ClassCard item={item} />;
           if (item.type === 'HOLIDAY') return <HolidayCard item={item} />;
           return null;
         }}
-        renderSectionHeader={({ section: { title } }) => (
-          <Text style={styles.sectionHeader}>{formatSectionHeaderDate(title)}</Text>
-        )}
-        ListEmptyComponent={
-          <View style={styles.centerContainer}>
-            <Text style={styles.emptyText}>No schedule found for today.</Text>
-          </View>
-        }
-        contentContainerStyle={styles.listContentContainer}
+        renderSectionHeader={() => <View style={{height: 10}} />} 
+        ListEmptyComponent={<EmptyScheduleState />}
+        contentContainerStyle={[
+            styles.listContentContainer, 
+            sections.length === 0 && styles.centerEmptyContent 
+        ]}
         stickySectionHeadersEnabled={false}
       />
     </SafeAreaView>
@@ -215,28 +336,97 @@ function TimetableScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f6f8' },
-  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  errorText: { color: '#c0392b', fontSize: 16, textAlign: 'center' },
-  emptyText: { fontSize: 16, color: '#7f8c8d' },
-  mainTitle: { fontSize: 32, fontWeight: 'bold', paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10, color: '#2c3e50' },
+  
+  headerContainer: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 5 },
+  mainTitle: { fontSize: 30, fontWeight: 'bold', color: '#2c3e50' },
+  dateSubtitle: { fontSize: 16, color: '#7f8c8d', fontWeight: '500', marginTop: 2 },
+
+  // Calendar Styles
+  calendarContainer: { marginVertical: 15, height: 75 },
+  dateItem: {
+    width: 60,
+    height: 70,
+    borderRadius: 16,
+    backgroundColor: 'white',
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  dateItemSelected: {
+    backgroundColor: '#2563eb', // Active Blue
+    transform: [{ scale: 1.05 }],
+  },
+  dayText: { fontSize: 13, color: '#95a5a6', fontWeight: '600', marginBottom: 4, textTransform: 'uppercase' },
+  dateNumText: { fontSize: 18, color: '#2c3e50', fontWeight: 'bold' },
+  textSelected: { color: 'white' },
+  activeDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'white', marginTop: 4 },
+
+  centerContainer: { alignItems: 'center', justifyContent: 'center', padding: 20 },
+  centerEmptyContent: { flexGrow: 1, justifyContent: 'center' },
+  
+  errorText: { color: '#c0392b', fontSize: 16, textAlign: 'center', marginTop: 10 },
+  
+  emptyTextTitle: { fontSize: 20, fontWeight: 'bold', color: '#7f8c8d', marginTop: 20 },
+  emptyTextSubtitle: { fontSize: 15, color: '#bdc3c7', marginTop: 5 },
+
   sectionHeader: { fontSize: 18, fontWeight: '600', paddingVertical: 12, color: '#7f8c8d', backgroundColor: '#f4f6f8' },
-  listContentContainer: { paddingHorizontal: 20, paddingBottom: 20 },
+  listContentContainer: { paddingHorizontal: 20, paddingBottom: 20, flexGrow: 1 },
 });
 
 const itemStyles = StyleSheet.create({
-  card: { flexDirection: 'row', alignItems: 'stretch' }, // Use stretch
+  card: { flexDirection: 'row', alignItems: 'stretch', marginBottom: 2 },
   timelineContainer: { alignItems: 'center', marginRight: 15 },
   iconContainer: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', zIndex: 1, backgroundColor: 'white' },
   timelineLine: { flex: 1, width: 2, backgroundColor: '#e0e0e0', marginTop: -10, marginBottom: -10 },
   detailsContainer: { flex: 1, backgroundColor: 'white', borderRadius: 12, padding: 15, elevation: 2, shadowColor: '#95a5a6', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, marginBottom: 15 },
+  
   timeText: { fontSize: 14, color: '#2980b9', fontWeight: '600', marginBottom: 6 },
   courseName: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50', marginBottom: 4 },
   facultyName: { fontSize: 15, color: '#7f8c8d' },
   footerContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
   footerText: { marginLeft: 6, fontSize: 14, color: '#7f8c8d' },
-  holidayTitle: { fontSize: 18, fontWeight: 'bold', color: '#f97316' },
-  holidayContent: { fontSize: 15, color: '#7f8c8d', marginTop: 4 },
+
+  // 🔥 NEW STYLES FOR HOLIDAY CARD 🔥
+  holidayGradientCard: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 20,
+    elevation: 4,
+    shadowColor: '#f97316',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fed7aa',
+    overflow: 'hidden', // Required for watermark
+    marginBottom: 10
+  },
+  holidayLabel: {
+    fontSize: 11,
+    color: '#c2410c',
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginBottom: 6,
+    opacity: 0.8
+  },
+  holidayTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#9a3412',
+    marginBottom: 4,
+  },
+  holidayContent: {
+    fontSize: 14,
+    color: '#c2410c',
+    opacity: 0.9,
+    fontWeight: '500'
+  },
 });
 
 export default TimetableScreen;
-

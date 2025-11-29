@@ -10,6 +10,7 @@ import {
   Button,
   Platform,
   UIManager,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -19,7 +20,9 @@ import {
   getDashboardAttendance,
   DashboardAttendance,
   getRegisteredCourses,
-  RegisteredCourse
+  RegisteredCourse,
+  getLectureWiseAttendance,
+  getWeeklySchedule,
 } from '../api';
 import { CircularProgress } from 'react-native-circular-progress';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -27,29 +30,20 @@ import LinearGradient from 'react-native-linear-gradient';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay } from 'react-native-reanimated';
 import { createShimmerPlaceholder } from 'react-native-shimmer-placeholder';
 
+import LiveTracker from './LiveTracker';
+
 const ShimmerPlaceholder = createShimmerPlaceholder(LinearGradient);
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// --- Helper Functions (No changes) ---
+// --- Helper Functions ---
 const getGreeting = (): string => {
-  const hour = new Date().getHours(); // Yeh 0 se 23 tak ka number dega
-
-  if (hour >= 5 && hour < 12) {
-    // Subah 5 baje se 11:59 AM tak
-    return "Good Morning,";
-  }
-  if (hour >= 12 && hour < 18) {
-    // Dopehar 12 baje se 5:59 PM tak
-    return "Good Afternoon,";
-  }
-  if (hour >= 18 && hour < 22) {
-    // Shaam 6 baje se 9:59 PM tak
-    return "Good Evening,";
-  }
-  // Baaki saara samay (Raat 10 baje se subah 4:59 AM tak)
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return "Good Morning,";
+  if (hour >= 12 && hour < 18) return "Good Afternoon,";
+  if (hour >= 18 && hour < 22) return "Good Evening,";
   return "Good Night,";
 };
 
@@ -69,15 +63,13 @@ const getAttendanceInfo = (present: number, total: number) => {
   }
 };
 
-// --- UI Components ---
 const SmartSummary = ({ present, total }: { present: number, total: number }) => {
-    // ✅ FIX: getAttendanceInfo ko pehle call kiya taaki 'message' variable available ho
     const { status, message } = getAttendanceInfo(present, total);
 
     if (total === 0) {
       return (
         <View style={styles.summaryBox}>
-          <Icon name="hourglass-outline" size={30} color="#3498db" />
+          <Icon name="hourglass-outline" size={30} color="#348b9f" />
           <View style={styles.summaryContent}>
             <Text style={styles.summaryStatusText}>Classes Haven't Started</Text>
             <Text style={styles.summaryDetailText}>{message}</Text>
@@ -114,7 +106,7 @@ const SmartSummary = ({ present, total }: { present: number, total: number }) =>
     }
 };
 
-const AnimatedAttendanceCard = ({ item, index }: { item: RegisteredCourse, index: number }) => {
+const AnimatedAttendanceCard = ({ item, index, todayStatus }: { item: RegisteredCourse, index: number, todayStatus?: string }) => {
   const navigation = useNavigation<any>();
   const { courseName, courseId, studentId, studentCourseCompDetails } = item;
   const details = studentCourseCompDetails?.[0];
@@ -145,6 +137,41 @@ const AnimatedAttendanceCard = ({ item, index }: { item: RegisteredCourse, index
     navigation.navigate('CourseDetails', { studentId, courseId, courseCompId, courseName });
   };
 
+  const renderTodayBadge = () => {
+    if (!todayStatus) return null;
+    
+    let badgeColor = '#7f8c8d';
+    let badgeBg = '#f4f6f8';
+    let badgeText = '';
+    let badgeIcon = '';
+
+    if (todayStatus === 'PRESENT') {
+        badgeColor = '#27ae60';
+        badgeBg = '#e8f5e9';
+        badgeText = 'Present Today';
+        badgeIcon = 'checkmark-circle';
+    } else if (todayStatus === 'ABSENT') {
+        badgeColor = '#c0392b';
+        badgeBg = '#ffebee';
+        badgeText = 'Absent Today';
+        badgeIcon = 'alert-circle';
+    } else if (todayStatus === 'PENDING') {
+        badgeColor = '#f39c12';
+        badgeBg = '#fff3e0';
+        badgeText = 'Not Marked Yet';
+        badgeIcon = 'time';
+    } else {
+        return null;
+    }
+
+    return (
+        <View style={[styles.todayBadge, { backgroundColor: badgeBg, borderColor: badgeColor + '40' }]}>
+            <Icon name={badgeIcon} size={14} color={badgeColor} />
+            <Text style={[styles.todayBadgeText, { color: badgeColor }]}>{badgeText}</Text>
+        </View>
+    );
+  };
+
   return (
     <Animated.View style={animatedStyle}>
       <TouchableOpacity onPress={handlePress} activeOpacity={0.9} style={styles.card}>
@@ -154,7 +181,13 @@ const AnimatedAttendanceCard = ({ item, index }: { item: RegisteredCourse, index
             <Text style={[styles.percentageText, { color: progressColor }]}>{percentage.toFixed(1)}%</Text>
           </View>
         </View>
-        <Text style={styles.attendedText}>{present} of {total} Attended</Text>
+        
+        <View style={styles.metaRow}>
+            {/* ✅ FIX: Removed extra brace causing the syntax error */}
+            <Text style={styles.attendedText}>{present} of {total} Attended</Text>
+            {renderTodayBadge()}
+        </View>
+
         <View style={styles.progressBarBackground}>
           <View style={[styles.progressBar, { width: `${percentage}%`, backgroundColor: progressColor }]} />
         </View>
@@ -171,7 +204,6 @@ const AnimatedAttendanceCard = ({ item, index }: { item: RegisteredCourse, index
 
 const SkeletonPlaceholderComponent = () => (
     <View style={{ paddingHorizontal: 16, paddingTop: 10 }}>
-      {/* Header Skeleton */}
       <View style={styles.header}>
           <View>
               <ShimmerPlaceholder style={{ width: 150, height: 20, borderRadius: 5, marginBottom: 8 }} />
@@ -180,14 +212,12 @@ const SkeletonPlaceholderComponent = () => (
           <ShimmerPlaceholder style={{ width: 80, height: 38, borderRadius: 20 }} />
       </View>
       
-      {/* Details Card Skeleton */}
       <View style={[styles.detailCard, {padding: 10}]}>
           <ShimmerPlaceholder style={{width: '90%', height: 20, borderRadius: 5, marginVertical: 12}} />
           <ShimmerPlaceholder style={{width: '80%', height: 20, borderRadius: 5, marginVertical: 12}} />
           <ShimmerPlaceholder style={{width: '85%', height: 20, borderRadius: 5, marginVertical: 12}} />
       </View>
 
-      {/* Overall Summary Skeleton */}
       <View style={[styles.card, { padding: 20 }]}>
           <ShimmerPlaceholder style={[styles.listHeader, { width: '70%', height: 22, marginBottom: 20 }]} />
           <View style={{flexDirection: 'row', alignItems: 'center'}}>
@@ -198,18 +228,9 @@ const SkeletonPlaceholderComponent = () => (
               </View>
           </View>
       </View>
-
-      {/* Subject Breakdown Skeleton */}
-      <ShimmerPlaceholder style={[styles.listHeader, { width: '80%', height: 22 }]} />
-      <View style={[styles.card, { padding: 20 }]}>
-          <ShimmerPlaceholder style={{width: '60%', height: 18, borderRadius: 5}}/>
-          <ShimmerPlaceholder style={{width: '40%', height: 15, borderRadius: 5, marginTop: 8}}/>
-          <ShimmerPlaceholder style={{width: '100%', height: 8, borderRadius: 4, marginTop: 15}}/>
-      </View>
     </View>
 );
 
-// --- Main Screen Component ---
 function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
   const [userData, setUserData] = useState<UserDetails | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardAttendance | null>(null);
@@ -217,6 +238,8 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  
+  const [todayAttendanceMap, setTodayAttendanceMap] = useState<{[key: number]: string}>({});
 
   const fetchAllData = useCallback(async () => {
     try {
@@ -232,6 +255,9 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
       setUserData(details);
       setDashboardData(dashboard);
       setCourses(registeredCourses);
+
+      fetchTodayStatuses(registeredCourses); // Call fetch statuses without passing component list
+
     } catch (err: any) {
       setError(err.message || 'Could not fetch data.');
     } finally {
@@ -240,13 +266,136 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
     }
   }, [refreshing]);
 
+  const fetchTodayStatuses = async (courseList: RegisteredCourse[]) => {
+    const today = new Date();
+    
+    // 🛑 1. Weekend Guard
+    const dayOfWeek = today.getDay(); 
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+        setTodayAttendanceMap({});
+        return;
+    }
+
+    // 2. Fetch Schedule
+    let scheduledCourses: { code: string; isLab: boolean; name: string }[] = [];
+    
+    try {
+        const schedule = await getWeeklySchedule();
+        const isScheduleToday = (dateStr: string) => {
+            if (!dateStr) return false;
+            let d = new Date();
+            if (dateStr.match(/^\d{2}[/-]\d{2}[/-]\d{4}/)) {
+                const [datePart] = dateStr.split(' ');
+                const [dNum, mNum, yNum] = datePart.split(/[/-]/).map(Number);
+                d = new Date(yNum, mNum - 1, dNum);
+            } else if (dateStr.match(/^\d{4}-\d{2}-\d{2}/)) {
+                d = new Date(dateStr.replace(' ', 'T'));
+            } else {
+                d = new Date(dateStr);
+            }
+            return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+        };
+
+        const todayClasses = schedule.filter(s => isScheduleToday(s.start) && s.type !== 'HOLIDAY');
+        
+        todayClasses.forEach(s => {
+            const nameLower = s.courseName?.toLowerCase() || '';
+            const isPractical = nameLower.includes('lab') || nameLower.includes('practical') || nameLower.includes('project');
+            
+            if (s.courseCode) {
+                scheduledCourses.push({
+                    code: s.courseCode.trim(),
+                    isLab: isPractical,
+                    name: nameLower.split('-')[0].trim()
+                });
+            }
+        });
+
+    } catch (e) {
+        return;
+    }
+
+    if (scheduledCourses.length === 0) {
+        setTodayAttendanceMap({});
+        return;
+    }
+
+    const statusMap: {[key: number]: string} = {};
+
+    const isAttendanceDateMatch = (dateStr: string) => {
+        if (!dateStr) return false;
+        let d = new Date();
+        if (dateStr.includes('/')) {
+            const [datePart] = dateStr.split(' ');
+            const [dNum, mNum, yNum] = datePart.split('/').map(Number);
+            d = new Date(yNum, mNum - 1, dNum);
+        } else {
+            d = new Date(dateStr);
+        }
+        return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+    };
+
+    await Promise.all(courseList.map(async (course) => {
+        const courseCode = course.courseCode.trim();
+        const courseNameLower = course.courseName.toLowerCase();
+        
+        const isTheory = !courseNameLower.includes('lab') && !courseNameLower.includes('practical') && !courseNameLower.includes('project');
+        
+        // Find matching schedule entry for this course 
+        const scheduledEntry = scheduledCourses.find(sch => sch.code === courseCode);
+
+        if (!scheduledEntry) return;
+
+        // Skip if schedule says Lab but this is theory, or vice-versa
+        if (isTheory && scheduledEntry.isLab) return; 
+        if (!isTheory && !scheduledEntry.isLab) return; 
+
+        // 🎯 LAB FIX: Iterate through ALL student components associated with this course
+        const componentsToCheck = course.studentCourseCompDetails || [];
+        
+        let foundMarkedAttendance = false;
+
+        for (const detail of componentsToCheck) {
+            // Note: detail objects do not contain courseId directly, but they are linked via the parent course object.
+
+            // 1. Check if record exists for this component today
+            try {
+                const lectures = await getLectureWiseAttendance({
+                    studentId: course.studentId,
+                    courseId: course.courseId,
+                    courseCompId: detail.courseCompId // Use THIS component ID
+                });
+                
+                const todayRecord = lectures.find(l => isAttendanceDateMatch(l.planLecDate));
+                
+                if (todayRecord && (todayRecord.attendance === 'PRESENT' || todayRecord.attendance === 'ABSENT')) {
+                    // SUCCESS: Found marked record for today in any component (Theory or Lab)
+                    statusMap[course.courseId] = todayRecord.attendance;
+                    foundMarkedAttendance = true;
+                    return; // Stop checking further components for this course (Fast Exit)
+                }
+            } catch (e) {
+                // Ignore API failure for this specific component and check the next one
+            }
+        }
+        
+        // If the loop finished and no PRESENT/ABSENT mark was found,
+        // and we know the class was scheduled
+        if (!foundMarkedAttendance) {
+            statusMap[course.courseId] = 'PENDING';
+        }
+    }));
+
+    setTodayAttendanceMap(statusMap);
+  };
+
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-  }, []);
+  }, [fetchAllData]);
 
   if (loading && !refreshing) {
     return (
@@ -278,6 +427,9 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
           <Text style={styles.logoutButtonText}>Logout</Text>
         </TouchableOpacity>
       </View>
+
+      <LiveTracker />
+
       <View style={styles.detailCard}>
         <View style={styles.detailRow}><Icon name="person-outline" size={20} color="#34495e" style={styles.iconStyle} /><Text style={styles.detailLabel}>Roll No.</Text><Text style={styles.detailValue}>{userData?.rollNumber?.trim()}</Text></View>
         <View style={styles.detailRow}><Icon name="school-outline" size={20} color="#34495e" style={styles.iconStyle} /><Text style={styles.detailLabel}>Branch</Text><Text style={styles.detailValue}>{userData?.branchShortName}</Text></View>
@@ -312,7 +464,13 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
       <LinearGradient colors={['#e7f2f8', '#f4f6f8', '#f4f6f8']} style={{ flex: 1 }}>
         <FlatList
           data={courses}
-          renderItem={({ item, index }) => <AnimatedAttendanceCard item={item} index={index} />}
+          renderItem={({ item, index }) => (
+            <AnimatedAttendanceCard 
+                item={item} 
+                index={index} 
+                todayStatus={todayAttendanceMap[item.courseId]} 
+            />
+          )}
           keyExtractor={(item) => item.courseId.toString()}
           ListHeaderComponent={ListHeader}
           showsVerticalScrollIndicator={false}
@@ -324,10 +482,9 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
   );
 }
 
-// --- Styles ---
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: '#e7f2f8' },
-    headerContainer: { /* paddingTop: 10 --- Isko hata diya */ },
+    headerContainer: {},
     centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f4f6f8', padding: 20 },
     errorText: { color: '#c0392b', textAlign: 'center', marginBottom: 20, fontSize: 16 },
     header: { paddingVertical: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -341,7 +498,7 @@ const styles = StyleSheet.create({
     courseName: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50', flex: 1, marginRight: 10, lineHeight: 24 },
     percentageContainer: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.05)' },
     percentageText: { fontSize: 20, fontWeight: 'bold' },
-    attendedText: { fontSize: 15, color: '#7f8c8d', marginTop: 4, marginBottom: 12 },
+    attendedText: { fontSize: 15, color: '#7f8c8d', marginTop: 0 }, 
     progressBarBackground: { height: 8, backgroundColor: '#ecf0f1', borderRadius: 4, overflow: 'hidden' },
     progressBar: { height: '100%', borderRadius: 4 },
     summaryBox: { flexDirection: 'row', marginTop: 15, backgroundColor: 'rgba(232, 245, 233, 0.8)', borderRadius: 12, padding: 15, alignItems: 'center' },
@@ -364,7 +521,11 @@ const styles = StyleSheet.create({
     cardFooterAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingTop: 15 },
     viewDetailsText: { color: '#2980b9', fontSize: 16, fontWeight: '600', marginRight: 8 },
     pressed: { opacity: 0.7 },
-  });
+    
+    // ✅ Styles for Today's Badge
+    metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    todayBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, borderWidth: 1 },
+    todayBadgeText: { fontSize: 11, fontWeight: '700', marginLeft: 4 },
+});
 
 export default HomeScreen;
-
