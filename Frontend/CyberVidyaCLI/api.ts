@@ -1,19 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { InternalAxiosRequestConfig, AxiosHeaderValue } from 'axios';
-import RNBlobUtil from 'react-native-blob-util'; // ✅ Required for PDF Download
+import RNBlobUtil from 'react-native-blob-util'; 
 import { Platform } from 'react-native';
 
-// Base URL ab seedhe Cyber Vidhya ka hai
 const API_BASE_URL = "https://kiet.cybervidya.net/api";
 const AUTH_TOKEN_KEY = 'authToken';
-const USER_CREDENTIALS_KEY = 'userCredentials';
-
-// Rate Limiting Constants
-const MAX_LOGIN_ATTEMPTS = 5;
-const LOCKOUT_DURATION_MINUTES = 5;
-const LOGIN_ATTEMPTS_KEY = 'loginAttempts';
-const LOCKOUT_TIMESTAMP_KEY = 'lockoutTimestamp';
-
 
 // --- Interfaces ---
 export interface UserDetails {
@@ -24,7 +15,7 @@ export interface UserDetails {
   degreeName: string;
   semesterName: string;
   admissionBatchName: string;
-  studentId?: number; // Added optional studentId if available in login response
+  studentId?: number; 
   attendanceCourseComponentInfoList: any[];
 }
 
@@ -32,15 +23,6 @@ export interface ApiResponse<T> {
     success: boolean;
     data: T;
     error?: string;
-    message?: string;
-}
-
-interface LoginApiResponse {
-    success: boolean;
-    data: {
-        token: string;
-        studentId?: number; // Capturing studentId from login if available
-    };
     message?: string;
 }
 
@@ -101,25 +83,25 @@ export interface ExamSchedule {
   courseComponentName: string;
 }
 
-// ✅ NEW INTERFACES FOR HALL TICKET
 export interface ExamSession {
   sessionId: number;
   sessionName: string;
 }
 
 export interface HallTicketOption {
-  id: number; // This is the hallTicketId needed for download
+  id: number;
   title: string;
 }
-
 
 // --- API Client and Interceptors ---
 export const apiClient = axios.create({ baseURL: API_BASE_URL });
 
+// 1. Request Interceptor: Attach Token
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
     if (token) {
+      // We use Authorization header because we found a JWT in LocalStorage
       config.headers['Authorization'] = token as AxiosHeaderValue;
     }
     console.log(`[API Request] --> ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
@@ -128,45 +110,58 @@ apiClient.interceptors.request.use(
   (error: any) => Promise.reject(error)
 );
 
+// 2. Response Interceptor: Mock Data on 401/Failure
 apiClient.interceptors.response.use(
   (response: any) => response,
   async (error: any) => {
-      const originalRequest = error.config;
-      if (error.response?.status === 401 && !originalRequest._retry) {
-        originalRequest._retry = true;
-        console.log('[Token Refresh] Token expired. Trying to refresh...');
-        try {
-          const credsString = await AsyncStorage.getItem(USER_CREDENTIALS_KEY);
-          if (!credsString) {
-            console.error('[Token Refresh] No saved credentials found.');
-            return Promise.reject(error);
-          }
+      const url = error.config?.url || "";
+      
+      // If unauthorized (401) or Forbidden (403), try to serve from Heist Cache
+      if (error.response?.status === 401 || error.response?.status === 403) {
+          console.log(`⚠️ API Failed (${url}) with ${error.response.status}. Checking Heist Cache...`);
 
-          const { username, password } = JSON.parse(credsString);
-
-          const { data } = await axios.post<LoginApiResponse>(`${API_BASE_URL}/auth/login`, {
-              userName: username,
-              password: password,
+          // Helper to create a fake successful response
+          const mockResponse = (data: any) => ({
+              data: { success: true, data: data },
+              status: 200,
+              statusText: "OK",
+              headers: {},
+              config: error.config
           });
 
-          if (data.data?.token) {
-            console.log('[Token Refresh] Successfully got new token.');
-            const newToken = `GlobalEducation ${data.data.token}`;
-            await AsyncStorage.setItem(AUTH_TOKEN_KEY, newToken);
-            
-            apiClient.defaults.headers.common['Authorization'] = newToken;
-            originalRequest.headers['Authorization'] = newToken;
-           
-            return apiClient(originalRequest);
-          } else {
-            throw new Error(data.message || 'Token refresh failed.');
+          try {
+            // A. Dashboard Attendance
+            if (url.includes('dashboard/attendance')) {
+                const cached = await AsyncStorage.getItem('CACHE_DASHBOARD');
+                if (cached) {
+                    console.log("✅ Serving Cached Dashboard!");
+                    return mockResponse(JSON.parse(cached));
+                }
+            }
+
+            // B. Registered Courses
+            if (url.includes('registered-courses')) {
+                const cached = await AsyncStorage.getItem('CACHE_COURSES');
+                if (cached) {
+                    console.log("✅ Serving Cached Courses!");
+                    return mockResponse(JSON.parse(cached));
+                }
+            }
+
+            // C. User Profile
+            if (url.includes('attendance/course/component/student')) {
+                const cached = await AsyncStorage.getItem('CACHE_PROFILE');
+                if (cached) {
+                    console.log("✅ Serving Cached Profile!");
+                    return mockResponse(JSON.parse(cached));
+                }
+            }
+          } catch (e) {
+              console.error("Cache retrieval failed", e);
           }
-        } catch (refreshError: any) {
-          console.error('[Token Refresh] CRITICAL: Failed to refresh token.', refreshError.message);
-          await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, USER_CREDENTIALS_KEY]);
-          return Promise.reject(refreshError);
-        }
       }
+
+      // If no cache or different error, reject
       return Promise.reject(error);
   }
 );
@@ -175,98 +170,42 @@ apiClient.interceptors.response.use(
 const handleError = (error: any, functionName: string): Error => {
     if (axios.isAxiosError(error)) {
         console.error(`❌ [API Error] in ${functionName}:`, {
-            message: error.message,
             status: error.response?.status,
-            data: error.response?.data,
             url: error.config?.url,
         });
-
-        let userMessage = 'An API error occurred.';
-        if (error.response?.data) {
-            const errorData = error.response.data;
-            if (errorData.error && typeof errorData.error.reason === 'string') {
-                userMessage = errorData.error.reason;
-            } else if (typeof errorData.message === 'string') {
-                userMessage = errorData.message;
-            } else {
-                 userMessage = `Request failed with status ${error.response.status}`;
-            }
-        } else {
-            userMessage = error.message;
-        }
-        return new Error(userMessage);
+        return new Error(error.message || 'An API error occurred.');
     } else {
-        console.error(`❌ [Non-API Error] in ${functionName}:`, error.message);
         return new Error(error.message || 'An unexpected error occurred.');
     }
 };
 
+// --- AUTH FUNCTIONS ---
 
-// --- API Functions ---
-
-export const login = async (username: string, password: string): Promise<any> => {
-    const lockoutTimestampStr = await AsyncStorage.getItem(LOCKOUT_TIMESTAMP_KEY);
-    if (lockoutTimestampStr) {
-        const lockoutTimestamp = parseInt(lockoutTimestampStr, 10);
-        const now = Date.now();
-        if (now < lockoutTimestamp) {
-            const remainingMinutes = Math.ceil((lockoutTimestamp - now) / (60 * 1000));
-            throw new Error(`Too many failed attempts. Please try again in ${remainingMinutes} minutes.`);
-        } else {
-            await AsyncStorage.removeItem(LOCKOUT_TIMESTAMP_KEY);
-            await AsyncStorage.removeItem(LOGIN_ATTEMPTS_KEY);
-        }
-    }
-
-    try {
-        const { data } = await axios.post<LoginApiResponse>(`${API_BASE_URL}/auth/login`, {
-            userName: username,
-            password: password
-        });
-
-        if (data.data?.token) {
-            await AsyncStorage.removeItem(LOGIN_ATTEMPTS_KEY);
-            
-            const authorizationHeader = `GlobalEducation ${data.data.token}`;
-            await AsyncStorage.setItem(AUTH_TOKEN_KEY, authorizationHeader);
-            await AsyncStorage.setItem(USER_CREDENTIALS_KEY, JSON.stringify({ username, password }));
-            
-            // Store Student ID if available (often needed for Hall Ticket)
-            if (data.data.studentId) {
-                await AsyncStorage.setItem('studentId', data.data.studentId.toString());
-            }
-
-            apiClient.defaults.headers.common['Authorization'] = authorizationHeader;
-            return data.data; // Return full data object to get studentId
-        }
-        
-        const errMsg = (axios.isAxiosError(data) && data.response?.data?.error?.reason) 
-                     ? data.response.data.error.reason 
-                     : (data.message || 'Login failed due to an unknown error.');
-        throw new Error(errMsg);
-    } catch (err: any) {
-         if (axios.isAxiosError(err)) {
-            const attemptsStr = await AsyncStorage.getItem(LOGIN_ATTEMPTS_KEY);
-            const currentAttempts = attemptsStr ? parseInt(attemptsStr, 10) : 0;
-            const newAttempts = currentAttempts + 1;
-
-            if (newAttempts >= MAX_LOGIN_ATTEMPTS) {
-                const lockoutUntil = Date.now() + LOCKOUT_DURATION_MINUTES * 60 * 1000;
-                await AsyncStorage.setItem(LOCKOUT_TIMESTAMP_KEY, lockoutUntil.toString());
-                await AsyncStorage.removeItem(LOGIN_ATTEMPTS_KEY);
-                throw new Error(`Too many failed attempts. You are locked out for ${LOCKOUT_DURATION_MINUTES} minutes.`);
-            } else {
-                await AsyncStorage.setItem(LOGIN_ATTEMPTS_KEY, newAttempts.toString());
-            }
-        }
-        throw handleError(err, 'login');
-    }
+// Simplified Login: Just stores the token provided by WebView
+export const login = async (token: string): Promise<string> => {
+    await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
+    return token;
 };
 
 export const logout = async () => {
-    await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
-    await AsyncStorage.removeItem('studentId');
-    delete apiClient.defaults.headers.common['Authorization'];
+    try {
+        await AsyncStorage.multiRemove([
+            AUTH_TOKEN_KEY,
+            'studentId',
+            'CACHE_DASHBOARD',
+            'CACHE_COURSES',
+            'CACHE_PROFILE'
+        ]);
+        
+        // Also clear cookies via CookieManager if possible (best effort)
+        // Note: This might not work perfectly on your specific Android setup but good to have
+        // You might need to import CookieManager here if not already imported
+        // await CookieManager.clearAll(); 
+        
+        delete apiClient.defaults.headers.common['Authorization'];
+    } catch (e) {
+        console.error("Logout Error:", e);
+    }
 };
 
 const getFormattedDate = (date: Date) => {
@@ -275,6 +214,8 @@ const getFormattedDate = (date: Date) => {
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 };
+
+// --- DATA FUNCTIONS ---
 
 export const getWeeklySchedule = async (): Promise<TimetableEvent[]> => {
     try {
@@ -288,13 +229,10 @@ export const getWeeklySchedule = async (): Promise<TimetableEvent[]> => {
         const url = `/student/schedule/class?weekEndDate=${weekEndDate}&weekStartDate=${weekStartDate}`;
         const response = await apiClient.get<ApiResponse<TimetableEvent[]>>(url);
         
-        if (response.data?.data) {
-              return response.data.data;
-        } else {
-            throw new Error(response.data.message || "Failed to get weekly schedule.");
-        }
+        return response.data?.data || [];
     } catch (err) {
-        throw handleError(err, 'getWeeklySchedule');
+        // Schedule is not critical, return empty if fails
+        return [];
     }
 };
 
@@ -304,7 +242,7 @@ export const getDashboardAttendance = async (): Promise<DashboardAttendance> => 
         if (response.data?.data) {
             return response.data.data;
         } else {
-            throw new Error(response.data.message || "Failed to get dashboard attendance.");
+            throw new Error("Failed to get dashboard attendance.");
         }
     } catch (err) {
         throw handleError(err, 'getDashboardAttendance');
@@ -317,7 +255,7 @@ export const getRegisteredCourses = async (): Promise<RegisteredCourse[]> => {
         if (response.data?.data) {
             return response.data.data;
         } else {
-            throw new Error(response.data.message || "Failed to get registered courses.");
+            throw new Error("Failed to get registered courses.");
         }
     } catch (err) {
         throw handleError(err, 'getRegisteredCourses');
@@ -330,8 +268,7 @@ export const getAttendanceAndDetails = async (): Promise<UserDetails> => {
         if (response.data?.data) {
             return response.data.data;
         } else {
-            console.log('[Debug] "getAttendanceAndDetails" received a response without a data payload:', response.data);
-            throw new Error(response.data.message || "No attendance details found in the API response.");
+            throw new Error("No attendance details found.");
         }
     } catch (err) {
         throw handleError(err, 'getAttendanceAndDetails');
@@ -340,22 +277,20 @@ export const getAttendanceAndDetails = async (): Promise<UserDetails> => {
 
 export const getLectureWiseAttendance = async (params: { studentId: number; courseId: number; courseCompId: number }): Promise<Lecture[]> => {
     try {
+        // NOTE: This POST request might still fail if session is invalid, 
+        // as we haven't cached lecture-wise data during login (it's too heavy).
         interface LectureApiResponse {
           data: LectureWiseAttendance[];
-          message?: string;
         }
         const response = await apiClient.post<LectureApiResponse>(
             '/attendance/schedule/student/course/attendance/percentage', 
             params
         );
         
-        if (response.data?.data?.[0]?.lectureList) {
-            return response.data.data[0].lectureList;
-        } else {
-            return [];
-        }
+        return response.data?.data?.[0]?.lectureList || [];
     } catch (err) {
-        throw handleError(err, 'getLectureWiseAttendance');
+        console.log("Lecture detail fetch failed (likely session expired)");
+        return [];
     }
 };
 
@@ -363,99 +298,69 @@ export const getExamSchedule = async (): Promise<ExamSchedule[]> => {
     try {
          interface ExamApiResponse {
             data: ExamSchedule[];
-            message?: string;
          }
         const response = await apiClient.get<ExamApiResponse>('/exam/schedule/student/exams');
-        if (response.data?.data) {
-            return response.data.data;
-        } else {
-             return [];
-        }
+        return response.data?.data || [];
     } catch (err: any) {
-        // Updated generic check for Exam schedule to return empty array on 400
-        const errorString = JSON.stringify(err);
-        if (errorString.includes("Exams are not scheduled yet") || errorString.includes("400 BAD_REQUEST0001")) {
-            return [];
-        }
-        throw handleError(err, 'getExamSchedule');
+        return [];
     }
 };
 
-// ==========================================
-// ✅ HALL TICKET DOWNLOAD FUNCTIONS (NEW)
-// ==========================================
+// --- HALL TICKET ---
 
-// 1. Get Exam Session ID
 export const getExamSession = async (studentId: string | number): Promise<ExamSession[]> => {
     try {
         interface SessionApiResponse {
             data: ExamSession[];
         }
         const response = await apiClient.get<SessionApiResponse>(`/exam/form/session/config/getById/student/${studentId}`);
-        
-        // ✅ Ab hum poora array return karenge, sirf pehla item nahi
-        if (response.data?.data) {
-            return response.data.data; 
-        }
-        return [];
+        return response.data?.data || [];
     } catch (err) {
-        throw handleError(err, 'getExamSession');
+        return [];
     }
 };
 
-// 2. Get Hall Ticket Options (e.g., MSE2 HALL TICKET)
 export const getHallTicketOptions = async (sessionId: number): Promise<HallTicketOption[]> => {
     try {
         interface OptionsApiResponse {
             data: HallTicketOption[];
         }
-        // URL from your prompt: /exam/hall-ticket/student/download/options/6
         const response = await apiClient.get<OptionsApiResponse>(`/exam/hall-ticket/student/download/options/${sessionId}`);
-        
-        if (response.data?.data) {
-            return response.data.data;
-        }
-        return [];
+        return response.data?.data || [];
     } catch (err) {
-        throw handleError(err, 'getHallTicketOptions');
+        return [];
     }
 };
 
-// 3. Download the actual PDF
-// Note: Returns the PATH where the file is saved
 export const downloadHallTicketPDF = async (hallTicketId: number, title: string): Promise<string> => {
     try {
-        // 1. Get Token manually for BlobUtil
         const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
         if (!token) throw new Error("User not authenticated");
 
-        // 2. Prepare Path
         const { dirs } = RNBlobUtil.fs;
-        const cleanTitle = title.replace(/[^a-zA-Z0-9]/g, '_'); // Remove spaces/special chars
+        const cleanTitle = title.replace(/[^a-zA-Z0-9]/g, '_'); 
         const fileName = `${cleanTitle}.pdf`;
         const filePath = Platform.OS === 'ios' 
             ? `${dirs.DocumentDir}/${fileName}` 
             : `${dirs.DownloadDir}/${fileName}`;
 
-        // 3. Prepare URL
         const url = `${API_BASE_URL}/report/pdf/exam/student/hall-ticket/download/${hallTicketId}`;
 
         console.log(`[Download] Starting download: ${url}`);
 
-        // 4. Use RNBlobUtil to download (Axios alone is bad for file saving)
         const res = await RNBlobUtil.config({
             fileCache: true,
             addAndroidDownloads: {
-                useDownloadManager: true, // Show in Android notification bar
+                useDownloadManager: true, 
                 notification: true,
                 path: filePath,
                 description: 'Downloading Hall Ticket...',
                 mime: 'application/pdf',
                 mediaScannable: true,
             },
-            path: filePath, // iOS path
+            path: filePath, 
         }).fetch('GET', url, {
-            'Authorization': token, // Pass the auth token header
+            'Authorization': token, // Attempt with Authorization Header
         });
 
         console.log(`[Download] Success. Path: ${res.path()}`);

@@ -42,8 +42,8 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 const getGreeting = (): string => {
   const hour = new Date().getHours();
   if (hour >= 5 && hour < 12) return "Good Morning,";
-  if (hour >= 12 && hour < 18) return "Good Afternoon,";
-  if (hour >= 18 && hour < 22) return "Good Evening,";
+  if (hour >= 12 && hour < 17) return "Good Afternoon,";
+  if (hour >= 17 && hour < 20) return "Good Evening,";
   return "Good Night,";
 };
 
@@ -160,6 +160,12 @@ const AnimatedAttendanceCard = ({ item, index, todayStatus }: { item: Registered
         badgeBg = '#fff3e0';
         badgeText = 'Not Marked Yet';
         badgeIcon = 'time';
+    } else if (todayStatus === 'SCHEDULED') {
+        // ✅ New Status for Future Classes
+        badgeColor = '#2980b9';
+        badgeBg = '#eaf2f8';
+        badgeText = 'Upcoming';
+        badgeIcon = 'calendar';
     } else {
         return null;
     }
@@ -277,7 +283,7 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
     }
 
     // 2. Fetch Schedule
-    let scheduledCourses: { code: string; isLab: boolean; name: string }[] = [];
+    let scheduledCourses: { code: string; isLab: boolean; name: string; startTime: Date | null; endTime: Date | null }[] = [];
     
     try {
         const schedule = await getWeeklySchedule();
@@ -302,11 +308,42 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
             const nameLower = s.courseName?.toLowerCase() || '';
             const isPractical = nameLower.includes('lab') || nameLower.includes('practical') || nameLower.includes('project');
             
+            // ✅ TIME PARSING LOGIC
+            let startTime: Date | null = null;
+            let endTime: Date | null = null;
+
+            try {
+                if (s.start && s.start.includes(' ')) {
+                    const [datePart, timePart] = s.start.split(' ');
+                    const [dNum, mNum, yNum] = datePart.split(/[/-]/).map(Number);
+                    startTime = new Date(yNum, mNum - 1, dNum);
+                    
+                    if (timePart) {
+                        const [h, m] = timePart.split(':').map(Number);
+                        startTime.setHours(h, m, 0, 0);
+                    }
+                }
+                
+                // ✅ End Time Parse
+                if (s.end && s.end.includes(' ')) {
+                    const [datePart, timePart] = s.end.split(' ');
+                    const [dNum, mNum, yNum] = datePart.split(/[/-]/).map(Number);
+                    endTime = new Date(yNum, mNum - 1, dNum);
+                    
+                    if (timePart) {
+                        const [h, m] = timePart.split(':').map(Number);
+                        endTime.setHours(h, m, 0, 0);
+                    }
+                }
+            } catch (e) { console.log('Time parse error', e); }
+
             if (s.courseCode) {
                 scheduledCourses.push({
                     code: s.courseCode.trim(),
                     isLab: isPractical,
-                    name: nameLower.split('-')[0].trim()
+                    name: nameLower.split('-')[0].trim(),
+                    startTime: startTime,
+                    endTime: endTime
                 });
             }
         });
@@ -350,37 +387,46 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
         if (isTheory && scheduledEntry.isLab) return; 
         if (!isTheory && !scheduledEntry.isLab) return; 
 
-        // 🎯 LAB FIX: Iterate through ALL student components associated with this course
-        const componentsToCheck = course.studentCourseCompDetails || [];
+        // 🛑 STRICT CHECK: If Lecture hasn't ended yet, DO NOT CHECK ATTENDANCE
+        let effectiveEndTime = scheduledEntry.endTime;
+        if (!effectiveEndTime && scheduledEntry.startTime) {
+             // Fallback: Assume class is 60 mins long if end time missing
+             effectiveEndTime = new Date(scheduledEntry.startTime.getTime() + 60 * 60 * 1000); 
+        }
+
+        const now = new Date();
         
+        // Agar abhi time EndTime se kam hai (Lecture chal raha hai ya hone wala hai)
+        if (effectiveEndTime && now < effectiveEndTime) {
+             statusMap[course.courseId] = 'SCHEDULED';
+             return; // Stop here, don't check API
+        }
+
+        // 🎯 If Lecture is OVER, then check API for status
+        const componentsToCheck = course.studentCourseCompDetails || [];
         let foundMarkedAttendance = false;
 
         for (const detail of componentsToCheck) {
-            // Note: detail objects do not contain courseId directly, but they are linked via the parent course object.
-
-            // 1. Check if record exists for this component today
             try {
                 const lectures = await getLectureWiseAttendance({
                     studentId: course.studentId,
                     courseId: course.courseId,
-                    courseCompId: detail.courseCompId // Use THIS component ID
+                    courseCompId: detail.courseCompId
                 });
                 
                 const todayRecord = lectures.find(l => isAttendanceDateMatch(l.planLecDate));
                 
                 if (todayRecord && (todayRecord.attendance === 'PRESENT' || todayRecord.attendance === 'ABSENT')) {
-                    // SUCCESS: Found marked record for today in any component (Theory or Lab)
                     statusMap[course.courseId] = todayRecord.attendance;
                     foundMarkedAttendance = true;
-                    return; // Stop checking further components for this course (Fast Exit)
+                    return; 
                 }
             } catch (e) {
-                // Ignore API failure for this specific component and check the next one
+                // Ignore API failure
             }
         }
         
-        // If the loop finished and no PRESENT/ABSENT mark was found,
-        // and we know the class was scheduled
+        // If lecture is over but no record found
         if (!foundMarkedAttendance) {
             statusMap[course.courseId] = 'PENDING';
         }

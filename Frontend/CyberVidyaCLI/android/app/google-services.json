@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1055564749848",
+    "project_id": "bunkbook-95516",
+    "storage_bucket": "bunkbook-95516.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1055564749848:android:d63d646ddef833d383376d",
+        "android_client_info": {
+          "package_name": "com.cybervidyacli"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBn5-4C0pr_kZ1_TpMZF_vv4xr0f2hcWzI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

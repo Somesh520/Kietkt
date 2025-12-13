@@ -1,26 +1,37 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, ActivityIndicator, StyleSheet, StatusBar, Text, TouchableOpacity } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, StatusBar, Text, TouchableOpacity, Alert, Linking } from 'react-native';
 
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import Icon from 'react-native-vector-icons/Ionicons';
+import axios from 'axios';
 
-// --- Imports ---
+// 🔥 ADVANCED MODULAR ANALYTICS IMPORT
+import { 
+  getAnalytics, 
+  logEvent, 
+  logScreenView, 
+  setUserId, 
+  setUserProperties,
+  resetAnalyticsData
+} from '@react-native-firebase/analytics';
+
 import LoginPage from './Screen/Login';
 import HomeScreen from './Screen/Home';
-import ProfileScreen from './Screen/profilescreen';
+import ProfileScreen from './Screen/profilescreen'; 
 import TimetableScreen from './Screen/Timetable';
 import CourseDetailsScreen from './Screen/CourseDetailsScreen';
 import ExamScheduleScreen from './Screen/Exams'; 
-// Ensure this filename matches your actual file (HallTicket.tsx or HallTicketScreen.tsx)
 import HallTicketScreen from './Screen/HallTicketScreen'; 
 import SplashScreen from './Screen/SplashScreen';
 import { logout } from './api';
 
 const AUTH_TOKEN_KEY = 'authToken';
+const CURRENT_APP_VERSION = "v1.1.3"; 
+const UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Somesh520/Kietkt/main/update.json";
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -29,30 +40,34 @@ type AuthProps = {
   onLogout: () => void;
 };
 
-// --- Custom Exam Manager (Toggle Switch) ---
+// --- Custom Exam Manager ---
 function ExamManagerScreen() {
   const [viewMode, setViewMode] = useState<'schedule' | 'ticket'>('schedule');
 
   return (
     <SafeAreaView style={styles.examContainer}>
-      {/* Custom Toggle Header */}
       <View style={styles.toggleContainer}>
         <TouchableOpacity 
           style={[styles.toggleBtn, viewMode === 'schedule' && styles.toggleBtnActive]} 
-          onPress={() => setViewMode('schedule')}
+          onPress={async () => {
+            setViewMode('schedule');
+            await logEvent(getAnalytics(), 'select_content', { content_type: 'exam_tab', item_id: 'datesheet' });
+          }}
         >
           <Text style={[styles.toggleText, viewMode === 'schedule' && styles.toggleTextActive]}>Datesheet</Text>
         </TouchableOpacity>
 
         <TouchableOpacity 
           style={[styles.toggleBtn, viewMode === 'ticket' && styles.toggleBtnActive]} 
-          onPress={() => setViewMode('ticket')}
+          onPress={async () => {
+            setViewMode('ticket');
+            await logEvent(getAnalytics(), 'select_content', { content_type: 'exam_tab', item_id: 'hall_ticket' });
+          }}
         >
           <Text style={[styles.toggleText, viewMode === 'ticket' && styles.toggleTextActive]}>Hall Ticket</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Main Content */}
       <View style={{ flex: 1, backgroundColor: '#f4f6f8' }}>
         {viewMode === 'schedule' ? <ExamScheduleScreen /> : <HallTicketScreen />}
       </View>
@@ -60,7 +75,6 @@ function ExamManagerScreen() {
   );
 }
 
-// --- Main Tabs ---
 function MainAppTabs({ onLogout }: AuthProps) {
   return (
     <Tab.Navigator
@@ -71,7 +85,6 @@ function MainAppTabs({ onLogout }: AuthProps) {
           else if (route.name === 'Timetable') iconName = focused ? 'calendar' : 'calendar-outline';
           else if (route.name === 'Exams') iconName = focused ? 'school' : 'school-outline';
           else if (route.name === 'About us') iconName = focused ? 'person-circle' : 'person-circle-outline';
-          
           return <Icon name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#2980b9',
@@ -82,22 +95,10 @@ function MainAppTabs({ onLogout }: AuthProps) {
         tabBarHideOnKeyboard: true,
       })}
     >
-      <Tab.Screen
-        name="Home"
-        children={() => <HomeScreen onLogout={onLogout} />}
-      />
-      <Tab.Screen
-        name="Timetable"
-        component={TimetableScreen}
-      />
-      <Tab.Screen
-        name="Exams"
-        component={ExamManagerScreen}
-      />
-      <Tab.Screen
-        name="About us"
-        component={ProfileScreen}
-      />
+      <Tab.Screen name="Home" children={() => <HomeScreen onLogout={onLogout} />} />
+      <Tab.Screen name="Timetable" component={TimetableScreen} />
+      <Tab.Screen name="Exams" component={ExamManagerScreen} />
+      <Tab.Screen name="About us" component={ProfileScreen} /> 
     </Tab.Navigator>
   );
 }
@@ -119,103 +120,186 @@ function AppStack({ onLogout }: AuthProps) {
   );
 }
 
+// 🚀 VERSION COMPARISON LOGIC (ProfileScreen se liya gaya)
+const compareVersions = (v1: string, v2: string) => {
+    const normalize = (v: string) => v.toLowerCase().startsWith('v') ? v.substring(1) : v;
+    const parts1 = normalize(v1).split('.').map(Number);
+    const parts2 = normalize(v2).split('.').map(Number);
+    
+    for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+        const p1 = parts1[i] || 0;
+        const p2 = parts2[i] || 0;
+        if (p1 > p2) return 1;
+        if (p1 < p2) return -1;
+    }
+    return 0;
+};
+
 function App(): React.JSX.Element {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [showSplash, setShowSplash] = useState<boolean>(true);
 
+  const navigationRef = useNavigationContainerRef();
+  const routeNameRef = useRef<string | undefined>(undefined); 
+
+  // 1. Token Check (Authentication)
   useEffect(() => {
     const checkToken = async () => {
-      const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-      setAuthToken(token);
+      try {
+        const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+        setAuthToken(token);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsLoading(false);
+      }
     };
     checkToken();
   }, []);
 
+  // 2. 🚀 UPDATE CHECK (Pop-up Alert Logic)
+  useEffect(() => {
+    const checkUpdatesAndShowAlert = async () => {
+        try {
+            const response = await axios.get(`${UPDATE_MANIFEST_URL}?t=${new Date().getTime()}`, { timeout: 5000 });
+            const manifest = response.data;
+            const latestVersion = manifest.version || CURRENT_APP_VERSION;
+            const downloadLink = manifest.downloadUrl || '';
+
+            // Agar latest version hamare current version se BADA hai (1)
+            if (compareVersions(latestVersion, CURRENT_APP_VERSION) === 1) {
+                Alert.alert(
+                    "🚀 New Update Available!",
+                    `Version ${latestVersion} is here! Update now for new features and fixes.`,
+                    [
+                        { 
+                            text: "Later", 
+                            style: "cancel" 
+                        },
+                        { 
+                            text: "Update Now", 
+                            onPress: () => {
+                                if (downloadLink) Linking.openURL(downloadLink);
+                            } 
+                        }
+                    ],
+                    { cancelable: false }
+                );
+                // Analytics: Update alert dikhaya
+                await logEvent(getAnalytics(), 'update_alert_shown', { current_version: CURRENT_APP_VERSION, latest_version: latestVersion });
+            }
+        } catch (error) {
+            console.warn("Failed to check for updates:", error);
+            // Network error hone par koi Alert nahi dikhayenge, App ko chalne denge.
+        }
+    };
+    
+    // Splash screen hatne ke baad check start karo (thoda delay dekar)
+    if (!showSplash) {
+        // 3 Second delay taaki app stable ho jaye
+        const timer = setTimeout(checkUpdatesAndShowAlert, 3000); 
+        return () => clearTimeout(timer);
+    }
+  }, [showSplash]);
+
+
   const handleSplashFinish = () => {
     setShowSplash(false);
-    setIsLoading(false);
   };
 
-  const handleLoginSuccess = (token: string) => {
+  const handleLoginSuccess = async (token: string) => {
     setAuthToken(token);
+    
+    const dummyUserId = token.substring(0, 10); 
+    await setUserId(getAnalytics(), dummyUserId);
+
+    await setUserProperties(getAnalytics(), {
+      student_branch: 'CSE',
+      student_year: '3rd',
+      app_version: CURRENT_APP_VERSION
+    });
+
+    await logEvent(getAnalytics(), 'login', { method: 'cybervidya_app' });
   };
 
   const handleLogout = async (): Promise<void> => {
-    await logout();
-    setAuthToken(null);
+    try {
+        await logout();
+        await AsyncStorage.removeItem(AUTH_TOKEN_KEY); 
+        
+        await logEvent(getAnalytics(), 'logout');
+        
+        await resetAnalyticsData(getAnalytics());
+        
+        setAuthToken(null);
+    } catch (error: any) {
+        await logEvent(getAnalytics(), 'app_error', { 
+            error_type: 'logout_failed',
+            error_message: error?.message || 'Unknown'
+        });
+        setAuthToken(null);
+    }
   };
-
-  if (showSplash) {
-    return <SplashScreen onFinish={handleSplashFinish} />;
-  }
-
-  if (isLoading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#2980b9" />
-      </View>
-    );
-  }
 
   return (
     <SafeAreaProvider>
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
-      <NavigationContainer>
-        <SafeAreaView style={styles.safeArea}>
-          {authToken ? (
-            <AppStack onLogout={handleLogout} />
-          ) : (
-            <LoginPage onLoginSuccess={handleLoginSuccess} />
-          )}
-        </SafeAreaView>
-      </NavigationContainer>
+
+      {!isLoading && (
+        <NavigationContainer
+            ref={navigationRef}
+            onReady={() => { routeNameRef.current = navigationRef.getCurrentRoute()?.name; }}
+            onStateChange={async () => {
+              const previousRouteName = routeNameRef.current;
+              const currentRouteName = navigationRef.getCurrentRoute()?.name ?? 'Unknown';
+
+              if (previousRouteName !== currentRouteName) {
+                await logScreenView(getAnalytics(), {
+                  screen_name: currentRouteName,
+                  screen_class: currentRouteName,
+                });
+                if (currentRouteName === 'Timetable') {
+                     await logEvent(getAnalytics(), 'check_timetable', { day: new Date().getDay() });
+                }
+              }
+              routeNameRef.current = currentRouteName;
+            }}
+        >
+            <SafeAreaView style={styles.safeArea}>
+            {authToken ? (
+                <AppStack onLogout={handleLogout} />
+            ) : (
+                <LoginPage onLoginSuccess={handleLoginSuccess} />
+            )}
+            </SafeAreaView>
+        </NavigationContainer>
+      )}
+
+      {showSplash && (
+        <View style={styles.splashContainer}>
+           <SplashScreen onFinish={handleSplashFinish} />
+        </View>
+      )}
+
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  splashContainer: {
+    ...StyleSheet.absoluteFillObject, 
+    zIndex: 1000,                     
+    backgroundColor: '#fff',          
   },
-  safeArea: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  examContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  toggleContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    justifyContent: 'center',
-  },
-  toggleBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  toggleBtnActive: {
-    borderBottomColor: '#2980b9',
-  },
-  toggleText: {
-    fontSize: 16,
-    color: '#888',
-    fontWeight: '500',
-  },
-  toggleTextActive: {
-    color: '#2980b9',
-    fontWeight: 'bold',
-  },
+  safeArea: { flex: 1, backgroundColor: 'transparent' },
+  examContainer: { flex: 1, backgroundColor: '#fff' },
+  toggleContainer: { flexDirection: 'row', backgroundColor: '#fff', paddingVertical: 10, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#eee', justifyContent: 'center' },
+  toggleBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  toggleBtnActive: { borderBottomColor: '#2980b9' },
+  toggleText: { fontSize: 16, color: '#888', fontWeight: '500' },
+  toggleTextActive: { color: '#2980b9', fontWeight: 'bold' },
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });
 
 export default App;
