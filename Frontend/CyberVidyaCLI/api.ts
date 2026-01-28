@@ -1,22 +1,38 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { InternalAxiosRequestConfig, AxiosHeaderValue } from 'axios';
-import RNBlobUtil from 'react-native-blob-util'; 
+import RNBlobUtil from 'react-native-blob-util';
 import { Platform } from 'react-native';
 
 const API_BASE_URL = "https://kiet.cybervidya.net/api";
 const AUTH_TOKEN_KEY = 'authToken';
 
 // --- Interfaces ---
+
+// Simple Event Emitter for Auth Errors
+type AuthEventListener = () => void;
+let authErrorListeners: AuthEventListener[] = [];
+
+export const onAuthError = (listener: AuthEventListener) => {
+    authErrorListeners.push(listener);
+    return () => {
+        authErrorListeners = authErrorListeners.filter(l => l !== listener);
+    };
+};
+
+const emitAuthError = () => {
+    authErrorListeners.forEach(l => l());
+};
+
 export interface UserDetails {
-  fullName: string;
-  registrationNumber: string;
-  rollNumber: string;
-  branchShortName: string;
-  degreeName: string;
-  semesterName: string;
-  admissionBatchName: string;
-  studentId?: number; 
-  attendanceCourseComponentInfoList: any[];
+    fullName: string;
+    registrationNumber: string;
+    rollNumber: string;
+    branchShortName: string;
+    degreeName: string;
+    semesterName: string;
+    admissionBatchName: string;
+    studentId?: number;
+    attendanceCourseComponentInfoList: any[];
 }
 
 export interface ApiResponse<T> {
@@ -27,70 +43,70 @@ export interface ApiResponse<T> {
 }
 
 export interface TimetableEvent {
-  type: 'CLASS' | 'HOLIDAY' | string;
-  start: string;
-  end: string;
-  courseName: string | null;
-  facultyName: string | null;
-  classRoom: string | null;
-  courseCode: string | null;
-  title: string;
-  content: string;
+    type: 'CLASS' | 'HOLIDAY' | string;
+    start: string;
+    end: string;
+    courseName: string | null;
+    facultyName: string | null;
+    classRoom: string | null;
+    courseCode: string | null;
+    title: string;
+    content: string;
 }
 
 export interface DashboardAttendance {
-  presentPerc: number;
-  absentPerc: number;
+    presentPerc: number;
+    absentPerc: number;
 }
 
 export interface CourseComponentDetail {
-  courseCompId: number;
-  courseCompFacultyName: string;
-  presentLecture: number;
-  totalLecture: number;
+    courseCompId: number;
+    courseCompFacultyName: string;
+    presentLecture: number;
+    totalLecture: number;
 }
 
 export interface RegisteredCourse {
-  studentId: number;
-  courseId: number;
-  courseCode: string;
-  courseName: string;
-  studentCourseCompDetails: CourseComponentDetail[];
+    studentId: number;
+    courseId: number;
+    courseCode: string;
+    courseName: string;
+    studentCourseCompDetails: CourseComponentDetail[];
 }
 
 export interface Lecture {
-  planLecDate: string;
-  topicCovered: string | null;
-  attendance: 'PRESENT' | 'ABSENT' | string;
-  timeSlot: string;
+    planLecDate: string;
+    topicCovered: string | null;
+    attendance: 'PRESENT' | 'ABSENT' | string;
+    timeSlot: string;
 }
 
 export interface LectureWiseAttendance {
-  presentCount: number;
-  lectureCount: number;
-  percent: number;
-  lectureList: Lecture[];
+    presentCount: number;
+    lectureCount: number;
+    percent: number;
+    lectureList: Lecture[];
 }
 
 export interface ExamSchedule {
-  strExamDate: string;
-  courseName: string;
-  evalLevelComponentName: string;
-  courseCode: string;
-  strExamTime: string | null;
-  examMode: string;
-  examVenueName: string;
-  courseComponentName: string;
+    strExamDate: string;
+    courseName: string;
+    evalLevelComponentName: string;
+    courseCode: string;
+    strExamTime: string | null;
+    examMode: string;
+    examVenueName: string;
+    courseComponentName: string;
 }
 
 export interface ExamSession {
-  sessionId: number;
-  sessionName: string;
+    sessionId: number;
+    sessionName: string;
 }
 
 export interface HallTicketOption {
-  id: number;
-  title: string;
+    id: number;
+    title: string;
 }
 
 // --- API Client and Interceptors ---
@@ -98,72 +114,75 @@ export const apiClient = axios.create({ baseURL: API_BASE_URL });
 
 // 1. Request Interceptor: Attach Token
 apiClient.interceptors.request.use(
-  async (config: InternalAxiosRequestConfig) => {
-    const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-    if (token) {
-      // We use Authorization header because we found a JWT in LocalStorage
-      config.headers['Authorization'] = token as AxiosHeaderValue;
-    }
-    console.log(`[API Request] --> ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
-    return config;
-  },
-  (error: any) => Promise.reject(error)
+    async (config: InternalAxiosRequestConfig) => {
+        const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+        if (token) {
+            // We use Authorization header because we found a JWT in LocalStorage
+            config.headers['Authorization'] = token as AxiosHeaderValue;
+        }
+        console.log(`[API Request] --> ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+        return config;
+    },
+    (error: any) => Promise.reject(error)
 );
 
 // 2. Response Interceptor: Mock Data on 401/Failure
 apiClient.interceptors.response.use(
-  (response: any) => response,
-  async (error: any) => {
-      const url = error.config?.url || "";
-      
-      // If unauthorized (401) or Forbidden (403), try to serve from Heist Cache
-      if (error.response?.status === 401 || error.response?.status === 403) {
-          console.log(`⚠️ API Failed (${url}) with ${error.response.status}. Checking Heist Cache...`);
+    (response: any) => response,
+    async (error: any) => {
+        const url = error.config?.url || "";
 
-          // Helper to create a fake successful response
-          const mockResponse = (data: any) => ({
-              data: { success: true, data: data },
-              status: 200,
-              statusText: "OK",
-              headers: {},
-              config: error.config
-          });
+        // If unauthorized (401) or Forbidden (403), try to serve from Heist Cache
+        if (error.response?.status === 401 || error.response?.status === 403) {
+            console.log(`⚠️ API Failed (${url}) with ${error.response.status}. Checking Heist Cache...`);
 
-          try {
-            // A. Dashboard Attendance
-            if (url.includes('dashboard/attendance')) {
-                const cached = await AsyncStorage.getItem('CACHE_DASHBOARD');
-                if (cached) {
-                    console.log("✅ Serving Cached Dashboard!");
-                    return mockResponse(JSON.parse(cached));
+            // Helper to create a fake successful response
+            const mockResponse = (data: any) => ({
+                data: { success: true, data: data },
+                status: 200,
+                statusText: "OK",
+                headers: {},
+                config: error.config
+            });
+
+            try {
+                // A. Dashboard Attendance
+                if (url.includes('dashboard/attendance')) {
+                    const cached = await AsyncStorage.getItem('CACHE_DASHBOARD');
+                    if (cached) {
+                        console.log("✅ Serving Cached Dashboard!");
+                        return mockResponse(JSON.parse(cached));
+                    }
                 }
-            }
 
-            // B. Registered Courses
-            if (url.includes('registered-courses')) {
-                const cached = await AsyncStorage.getItem('CACHE_COURSES');
-                if (cached) {
-                    console.log("✅ Serving Cached Courses!");
-                    return mockResponse(JSON.parse(cached));
+                // B. Registered Courses
+                if (url.includes('registered-courses')) {
+                    const cached = await AsyncStorage.getItem('CACHE_COURSES');
+                    if (cached) {
+                        console.log("✅ Serving Cached Courses!");
+                        return mockResponse(JSON.parse(cached));
+                    }
                 }
-            }
 
-            // C. User Profile
-            if (url.includes('attendance/course/component/student')) {
-                const cached = await AsyncStorage.getItem('CACHE_PROFILE');
-                if (cached) {
-                    console.log("✅ Serving Cached Profile!");
-                    return mockResponse(JSON.parse(cached));
+                // C. User Profile
+                if (url.includes('attendance/course/component/student')) {
+                    const cached = await AsyncStorage.getItem('CACHE_PROFILE');
+                    if (cached) {
+                        console.log("✅ Serving Cached Profile!");
+                        return mockResponse(JSON.parse(cached));
+                    }
                 }
+            } catch (e) {
+                console.error("Cache retrieval failed", e);
             }
-          } catch (e) {
-              console.error("Cache retrieval failed", e);
-          }
-      }
+            // If cache failed, EMIT AUTH ERROR so app can logout
+            console.log("❌ No cache found for 401/403. Emitting Auth Error.");
+            emitAuthError();
+        }
 
-      // If no cache or different error, reject
-      return Promise.reject(error);
-  }
+        // If no cache or different error, reject
+        return Promise.reject(error);
+    }
 );
 
 // Helper function to handle errors
@@ -196,12 +215,12 @@ export const logout = async () => {
             'CACHE_COURSES',
             'CACHE_PROFILE'
         ]);
-        
+
         // Also clear cookies via CookieManager if possible (best effort)
         // Note: This might not work perfectly on your specific Android setup but good to have
         // You might need to import CookieManager here if not already imported
         // await CookieManager.clearAll(); 
-        
+
         delete apiClient.defaults.headers.common['Authorization'];
     } catch (e) {
         console.error("Logout Error:", e);
@@ -228,7 +247,7 @@ export const getWeeklySchedule = async (): Promise<TimetableEvent[]> => {
 
         const url = `/student/schedule/class?weekEndDate=${weekEndDate}&weekStartDate=${weekStartDate}`;
         const response = await apiClient.get<ApiResponse<TimetableEvent[]>>(url);
-        
+
         return response.data?.data || [];
     } catch (err) {
         // Schedule is not critical, return empty if fails
@@ -275,18 +294,37 @@ export const getAttendanceAndDetails = async (): Promise<UserDetails> => {
     }
 };
 
+// 📸 Get Student Profile Info (including profile photo)
+export const getStudentProfileInfo = async (): Promise<{
+    fullName: string;
+    registrationNumber: string;
+    profilePhoto?: string;
+    [key: string]: any;
+}> => {
+    try {
+        const response = await apiClient.get('/info/student/fetch');
+        if (response.data?.data) {
+            return response.data.data;
+        } else {
+            throw new Error("No profile info found.");
+        }
+    } catch (err) {
+        throw handleError(err, 'getStudentProfileInfo');
+    }
+};
+
 export const getLectureWiseAttendance = async (params: { studentId: number; courseId: number; courseCompId: number }): Promise<Lecture[]> => {
     try {
         // NOTE: This POST request might still fail if session is invalid, 
         // as we haven't cached lecture-wise data during login (it's too heavy).
         interface LectureApiResponse {
-          data: LectureWiseAttendance[];
+            data: LectureWiseAttendance[];
         }
         const response = await apiClient.post<LectureApiResponse>(
-            '/attendance/schedule/student/course/attendance/percentage', 
+            '/attendance/schedule/student/course/attendance/percentage',
             params
         );
-        
+
         return response.data?.data?.[0]?.lectureList || [];
     } catch (err) {
         console.log("Lecture detail fetch failed (likely session expired)");
@@ -296,9 +334,9 @@ export const getLectureWiseAttendance = async (params: { studentId: number; cour
 
 export const getExamSchedule = async (): Promise<ExamSchedule[]> => {
     try {
-         interface ExamApiResponse {
+        interface ExamApiResponse {
             data: ExamSchedule[];
-         }
+        }
         const response = await apiClient.get<ExamApiResponse>('/exam/schedule/student/exams');
         return response.data?.data || [];
     } catch (err: any) {
@@ -338,10 +376,10 @@ export const downloadHallTicketPDF = async (hallTicketId: number, title: string)
         if (!token) throw new Error("User not authenticated");
 
         const { dirs } = RNBlobUtil.fs;
-        const cleanTitle = title.replace(/[^a-zA-Z0-9]/g, '_'); 
+        const cleanTitle = title.replace(/[^a-zA-Z0-9]/g, '_');
         const fileName = `${cleanTitle}.pdf`;
-        const filePath = Platform.OS === 'ios' 
-            ? `${dirs.DocumentDir}/${fileName}` 
+        const filePath = Platform.OS === 'ios'
+            ? `${dirs.DocumentDir}/${fileName}`
             : `${dirs.DownloadDir}/${fileName}`;
 
         const url = `${API_BASE_URL}/report/pdf/exam/student/hall-ticket/download/${hallTicketId}`;
@@ -351,14 +389,14 @@ export const downloadHallTicketPDF = async (hallTicketId: number, title: string)
         const res = await RNBlobUtil.config({
             fileCache: true,
             addAndroidDownloads: {
-                useDownloadManager: true, 
+                useDownloadManager: true,
                 notification: true,
                 path: filePath,
                 description: 'Downloading Hall Ticket...',
                 mime: 'application/pdf',
                 mediaScannable: true,
             },
-            path: filePath, 
+            path: filePath,
         }).fetch('GET', url, {
             'Authorization': token, // Attempt with Authorization Header
         });

@@ -6,8 +6,8 @@ import {
   StatusBar,
   Text,
   SafeAreaView,
-  Animated,
-  Easing
+  TouchableOpacity,
+  Alert
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -21,116 +21,133 @@ type LoginProps = {
   onLoginSuccess: (token: string) => void;
 };
 
-// 🧹 CLEANUP SCRIPT (Previous session clear)
-const CLEAR_SESSION_SCRIPT = `
-    (function() {
+// ⚡ AGGRESSIVE SPEED SCRIPT: Block images + Fast login detect
+const FAST_LOGIN_SCRIPT = `
+  (function() {
+    // 1. BLOCK IMAGE LOADING - सबसे पहले ये करो!
+    // Override Image constructor
+    const OriginalImage = window.Image;
+    window.Image = function() {
+      const img = new OriginalImage();
+      Object.defineProperty(img, 'src', {
+        set: function(v) { /* Block */ },
+        get: function() { return ''; }
+      });
+      return img;
+    };
+
+    // Stop img tags from loading
+    const observer = new MutationObserver(function(mutations) {
+      mutations.forEach(function(m) {
+        m.addedNodes.forEach(function(node) {
+          if (node.tagName === 'IMG') {
+            node.removeAttribute('src');
+            node.removeAttribute('srcset');
+          }
+        });
+      });
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+
+    // 2. 🔥 ALWAYS Clear Storage on Initial Load (Prevents Auto-Login)
+    try {
       window.localStorage.clear();
       window.sessionStorage.clear();
-      document.cookie.split(";").forEach(function(c) { 
-        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-      });
-    })();
-    true;
-  `;
+      console.log('🧹 Storage cleared on page load');
+    } catch(e) {
+      console.log('Clear failed:', e);
+    }
 
-// 🛠️ LOGIN DETECTION SCRIPT - Optimized for speed (100ms polling, immediate clear)
-const CHECK_LOGIN_SCRIPT = `
-    var intervalId = setInterval(function() {
-      var url = window.location.href;
-      if (url.includes('home') || url.includes('dashboard') || url.includes('main')) {
-        var token = localStorage.getItem('authenticationtoken');
-        if (token) {
-          clearInterval(intervalId); // 🔥 महत्वपूर्ण: टोकन मिलने पर तुरंत बंद करें
-          if (token.startsWith('"')) { token = JSON.parse(token); }
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'LOGIN_DONE',
-            token: token
-          }));
-        }
+    // 3. Fast Token Polling (200ms)
+    var check = setInterval(function() {
+      var token = localStorage.getItem('authenticationtoken');
+      if (token && token.length > 5) {
+        clearInterval(check);
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'LOGIN_DONE', token: token }));
       }
-    }, 100); // 100 मिलीसेकंड पर चेक करें
+    }, 200);
+  })();
+  true;
 `;
 
 const LoginPage = ({ onLoginSuccess }: LoginProps) => {
-  const [loading, setLoading] = useState(true);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [showAnim, setShowAnim] = useState(false); 
-  
+  const [isLoading, setIsLoading] = useState(true);
   const webViewRef = useRef<WebView>(null);
 
-  const fadeAnim = useRef(new Animated.Value(0)).current;  
-  const scaleAnim = useRef(new Animated.Value(0.3)).current; 
+  // 🔥 Clear session on mount to prevent auto-login
+  React.useEffect(() => {
+    const clearSession = async () => {
+      try {
+        // Clear WebView cache and storage
+        webViewRef.current?.clearCache(true);
 
-  const triggerSuccessAnimation = async (finalToken: string) => {
-    setShowAnim(true); 
-    await AsyncStorage.setItem('authToken', finalToken);
+        // Inject script to clear all storage
+        webViewRef.current?.injectJavaScript(`
+          localStorage.clear();
+          sessionStorage.clear();
+          true;
+        `);
 
-    // 📊 ANALYTICS LOGGING
-    try {
-        await logEvent(getAnalytics(), 'login_success', {
-            method: 'cybervidya_webview',
-            timestamp: new Date().toISOString(),
-        });
-        console.log("📊 Analytics Event Sent");
-    } catch (error) {
-        console.log("⚠️ Analytics Error:", error);
-    }
+        console.log('✅ WebView session cleared');
+      } catch (e) {
+        console.log('Failed to clear session:', e);
+      }
+    };
 
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 6,
-        tension: 40,
-        useNativeDriver: true,
-      })
-    ]).start();
-
-    // 1.5 सेकंड के बजाय, 1 सेकंड के बाद रीडायरेक्ट करें
-    setTimeout(() => {
-      onLoginSuccess(finalToken);
-    }, 1000); // 🔥 500ms कम किया गया
-  };
+    // Small delay to ensure WebView is ready
+    setTimeout(clearSession, 500);
+  }, []);
 
   const handleMessage = async (event: any) => {
-    if (isSuccess) return;
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'LOGIN_DONE') {
-        console.log("✅ Login Found!");
         let finalToken = data.token;
-        if (!finalToken.includes('GlobalEducation')) {
-            finalToken = `GlobalEducation ${finalToken}`;
-        }
-        setIsSuccess(true);
-        triggerSuccessAnimation(finalToken);
+        if (finalToken.startsWith('"')) finalToken = JSON.parse(finalToken);
+        if (!finalToken.includes('GlobalEducation')) finalToken = `GlobalEducation ${finalToken}`;
+
+        // 🚀 INSTANT ACTION: No Animation Wait
+        await AsyncStorage.setItem('authToken', finalToken);
+        logEvent(getAnalytics(), 'login_success', { method: 'rocket_mode' });
+        onLoginSuccess(finalToken);
       }
     } catch (e) { }
+  };
+
+  const handleReload = () => {
+    setIsLoading(true);
+    webViewRef.current?.reload();
+  };
+
+  const handleClearCache = () => {
+    Alert.alert("Reset", "Clear Cache & Reload?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Yes", onPress: () => {
+          setIsLoading(true);
+          webViewRef.current?.clearCache(true);
+          webViewRef.current?.reload();
+        }
+      }
+    ]);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>CyberVidya Login</Text>
-      </View>
 
-      <View style={styles.securityBanner}>
-        <Icon name="information-circle" size={18} color="#856404" />
-        <Text style={styles.securityText}>
-          Due to tightened security on CyberVidya, we are using this secure browser method to log you in.
-        </Text>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>CyberVidya (Lite Mode) ⚡</Text>
       </View>
 
       <View style={styles.webViewContainer}>
-        {loading && !showAnim && (
+
+        {/* Loader jo turant hatt jayega */}
+        {isLoading && (
           <View style={styles.loaderContainer}>
             <ActivityIndicator size="large" color="#2980b9" />
-            <Text style={styles.loadingText}>Opening Portal...</Text>
+            <Text style={styles.loadingText}>Connecting...</Text>
           </View>
         )}
 
@@ -138,36 +155,33 @@ const LoginPage = ({ onLoginSuccess }: LoginProps) => {
           ref={webViewRef}
           source={{ uri: LOGIN_URL }}
           style={styles.webView}
-          injectedJavaScriptBeforeContentLoaded={CLEAR_SESSION_SCRIPT}
-          injectedJavaScript={CHECK_LOGIN_SCRIPT} // ✅ Updated Script
+          injectedJavaScript={FAST_LOGIN_SCRIPT}
           onMessage={handleMessage}
+
+          // 🔥🔥 THE SPEED HACKS 🔥🔥
+          // blockNetworkImage={true}         // 1. Images Block (Sabse Tez)
+          cacheEnabled={true}              // 2. Cache On
+          cacheMode="LOAD_CACHE_ELSE_NETWORK" // 3. Agar cache hai, to net mat use karo
+
+          userAgent={USER_AGENT}
           javaScriptEnabled={true}
           domStorageEnabled={true}
-          sharedCookiesEnabled={true}
-          cacheEnabled={true}
-          mixedContentMode="always" 
-          userAgent={USER_AGENT}
-          onLoadStart={() => setLoading(true)}
-          onLoadEnd={() => setLoading(false)}
-          androidLayerType="hardware" // 🔥 Android Performance Improvement
+          androidLayerType="hardware"      // 4. GPU Acceleration
+          overScrollMode="never"
+
+          // 🚀 Aggressive Loader Hiding
+          onLoadProgress={({ nativeEvent }) => {
+            // Wait for 75% load to avoid partial rendering
+            if (nativeEvent.progress > 0.75) setIsLoading(false);
+          }}
         />
 
-        {showAnim && (
-          <View style={styles.successOverlay}>
-            <Animated.View style={[styles.animBox, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
-              <View style={styles.iconCircle}>
-                <Icon name="checkmark" size={50} color="#fff" />
-              </View>
-              <Text style={styles.successTitle}>Login Successful!</Text>
-              <Text style={styles.successSub}>Redirecting to App...</Text>
-            </Animated.View>
-          </View>
+        {/* Reload Button (Agar atak jaye) */}
+        {!isLoading && (
+          <TouchableOpacity style={styles.reloadBtn} onPress={handleReload} onLongPress={handleClearCache}>
+            <Icon name="refresh" size={24} color="#fff" />
+          </TouchableOpacity>
         )}
-      </View>
-
-      <View style={styles.footer}>
-        <Icon name="lock-closed" size={14} color="green" />
-        <Text style={styles.footerText}> End-to-End Encrypted Session </Text>
       </View>
     </SafeAreaView>
   );
@@ -175,23 +189,22 @@ const LoginPage = ({ onLoginSuccess }: LoginProps) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  header: { height: 50, justifyContent: 'center', alignItems: 'center', borderBottomWidth: 1, borderColor: '#eee', backgroundColor: '#fff' },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-  securityBanner: { backgroundColor: '#fff3cd', padding: 10, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: '#ffeeba' },
-  securityText: { color: '#856404', fontSize: 12, marginLeft: 8, flex: 1, flexWrap: 'wrap' },
-  webViewContainer: { flex: 1, width: '100%', height: '100%', position: 'relative' },
-  webView: { flex: 1, backgroundColor: 'transparent' },
-  loaderContainer: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', zIndex: 10 },
-  loadingText: { marginTop: 10, color: '#2980b9' },
-  
-  successOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center', zIndex: 100 },
-  
-  animBox: { alignItems: 'center', justifyContent: 'center', padding: 20, borderRadius: 20 },
-  iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#27ae60', justifyContent: 'center', alignItems: 'center', marginBottom: 20, elevation: 8 },
-  successTitle: { fontSize: 22, fontWeight: 'bold', color: '#2c3e50', marginBottom: 5 },
-  successSub: { fontSize: 14, color: '#7f8c8d' },
-  footer: { padding: 8, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', borderTopWidth: 1, borderColor: '#eee', backgroundColor: '#f9f9f9' },
-  footerText: { fontSize: 12, color: '#666', marginLeft: 5 }
+  header: { height: 45, justifyContent: 'center', alignItems: 'center', borderBottomWidth: 1, borderColor: '#eee' },
+  headerTitle: { fontSize: 16, fontWeight: 'bold', color: '#333' },
+
+  webViewContainer: { flex: 1 },
+  webView: { flex: 1 },
+
+  loaderContainer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', zIndex: 10 },
+  loadingText: { marginTop: 10, color: '#555' },
+
+  reloadBtn: {
+    position: 'absolute', bottom: 30, right: 30,
+    width: 50, height: 50, borderRadius: 25,
+    backgroundColor: '#2980b9',
+    justifyContent: 'center', alignItems: 'center',
+    elevation: 5, zIndex: 100
+  }
 });
 
 export default LoginPage;

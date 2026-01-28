@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, SafeAreaView, FlatList, Modal 
+import {
+  View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, FlatList, Modal
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { getExamSession, getHallTicketOptions, downloadHallTicketPDF, getRegisteredCourses } from '../api';
@@ -23,11 +24,11 @@ const HallTicketScreen = () => {
       // --- Auto-Fix ID Logic ---
       if (!id) {
         try {
-            const courses = await getRegisteredCourses();
-            if (courses && courses.length > 0) {
-                id = courses[0].studentId.toString();
-                await AsyncStorage.setItem('studentId', id);
-            }
+          const courses = await getRegisteredCourses();
+          if (courses && courses.length > 0) {
+            id = courses[0].studentId.toString();
+            await AsyncStorage.setItem('studentId', id);
+          }
         } catch (e) { console.log("Auto-recovery failed", e); }
       }
       // ------------------------
@@ -47,7 +48,7 @@ const HallTicketScreen = () => {
     try {
       setLoading(true);
       const sessions = await getExamSession(id);
-      
+
       if (sessions && sessions.length > 0) {
         setSessionList(sessions);
         setSelectedSession(sessions[0]); // By default pehla select karein
@@ -97,12 +98,12 @@ const HallTicketScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      
+
       {/* ✅ SESSION SELECTOR DROPDOWN */}
       <View style={styles.selectorContainer}>
         <Text style={styles.label}>Select Academic Session:</Text>
-        <TouchableOpacity 
-          style={styles.dropdown} 
+        <TouchableOpacity
+          style={styles.dropdown}
           onPress={() => setSessionList.length > 0 && setModalVisible(true)}
         >
           <Text style={styles.dropdownText}>
@@ -114,9 +115,9 @@ const HallTicketScreen = () => {
 
       {/* Main Content */}
       {loading ? (
-         <View style={styles.center}>
-           <ActivityIndicator size="large" color="#2980b9" />
-         </View>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#2980b9" />
+        </View>
       ) : (
         <FlatList
           data={tickets}
@@ -140,8 +141,8 @@ const HallTicketScreen = () => {
                 <Text style={styles.cardTitle}>{item.title}</Text>
                 <Text style={styles.cardSub}>PDF Available</Text>
               </View>
-              <TouchableOpacity 
-                style={styles.downloadBtn} 
+              <TouchableOpacity
+                style={styles.downloadBtn}
                 onPress={() => handleDownload(item)}
               >
                 <Icon name="download-outline" size={24} color="#fff" />
@@ -166,20 +167,20 @@ const HallTicketScreen = () => {
                 <Icon name="close" size={24} color="#333" />
               </TouchableOpacity>
             </View>
-            
+
             <FlatList
               data={sessionList}
               keyExtractor={(item) => item.sessionId.toString()}
               renderItem={({ item }) => (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[
-                    styles.modalItem, 
+                    styles.modalItem,
                     selectedSession?.sessionId === item.sessionId && styles.modalItemActive
                   ]}
                   onPress={() => handleSessionChange(item)}
                 >
                   <Text style={[
-                    styles.modalItemText, 
+                    styles.modalItemText,
                     selectedSession?.sessionId === item.sessionId && styles.modalItemTextActive
                   ]}>
                     {item.sessionName}
@@ -201,7 +202,7 @@ const HallTicketScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f6f8' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 },
-  
+
   // Selector Styles
   selectorContainer: { padding: 15, backgroundColor: '#fff', elevation: 2 },
   label: { fontSize: 12, color: '#666', marginBottom: 5, fontWeight: '600' },

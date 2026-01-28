@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  SafeAreaView, 
-  RefreshControl, 
-  Animated, 
-  Easing 
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  // SafeAreaView removed from here
+  RefreshControl,
+  Animated,
+  Easing
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { getExamSchedule, ExamSchedule } from '../api';
 
@@ -82,8 +83,8 @@ const ExamScheduleScreen = () => {
   };
 
   const parseDate = (dateString: string): Date => {
-      const [day, month, year] = dateString.split('/').map(Number);
-      return new Date(year, month - 1, day);
+    const [day, month, year] = dateString.split('/').map(Number);
+    return new Date(year, month - 1, day);
   };
 
   // ✅ THIS FUNCTION IS FIXED TO HANDLE YOUR SPECIFIC ERROR
@@ -91,7 +92,7 @@ const ExamScheduleScreen = () => {
     try {
       setError(null);
       let data = await getExamSchedule();
-      
+
       if (Array.isArray(data)) {
         data.sort((a, b) => {
           const dateA_str = a.strExamDate.split('-')[0];
@@ -118,7 +119,7 @@ const ExamScheduleScreen = () => {
         errorString.includes("400 BAD_REQUEST0001")
       ) {
         // ✅ Ye Error nahi hai, bas list khali hai
-        setExams([]); 
+        setExams([]);
         setError(null);
       } else {
         // ❌ Ye asli error hai
@@ -144,10 +145,10 @@ const ExamScheduleScreen = () => {
     return (
       <SafeAreaView style={styles.container}>
         <Text style={styles.headerTitle}>Exam Schedule</Text>
-        <View style={{paddingHorizontal: 16}}>
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
+        <View style={{ paddingHorizontal: 16 }}>
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
         </View>
       </SafeAreaView>
     );
@@ -158,8 +159,8 @@ const ExamScheduleScreen = () => {
     return (
       <View style={styles.centerContainer}>
         <Icon name="alert-circle-outline" size={50} color="#D93025" />
-        <Text style={[styles.errorText, {marginTop: 10}]}>Something went wrong</Text>
-        <Text style={{color: '#777', textAlign: 'center', marginTop: 5}}>{error}</Text>
+        <Text style={[styles.errorText, { marginTop: 10 }]}>Something went wrong</Text>
+        <Text style={{ color: '#777', textAlign: 'center', marginTop: 5 }}>{error}</Text>
       </View>
     );
   }
@@ -172,14 +173,14 @@ const ExamScheduleScreen = () => {
         keyExtractor={(item, index) => `${index}-${item.strExamDate}`}
         renderItem={({ item }) => {
           const courseDetailsString = (item as any).courseDetails;
-          
+
           const details = (courseDetailsString && typeof courseDetailsString === 'string')
             ? parseCourseDetails(courseDetailsString)
-            : { 
-                courseName: (item as any).courseName || 'N/A', 
-                courseCode: (item as any).courseCode || 'N/A', 
-                examType: (item as any).evalLevelComponentName || 'N/A' 
-              };
+            : {
+              courseName: (item as any).courseName || 'N/A',
+              courseCode: (item as any).courseCode || 'N/A',
+              examType: (item as any).evalLevelComponentName || 'N/A'
+            };
 
           return (
             <View style={styles.card}>
@@ -201,7 +202,7 @@ const ExamScheduleScreen = () => {
         }}
         // ✅ Empty Component ab sahi se trigger hoga
         ListEmptyComponent={<EmptyExamState />}
-        
+
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#4a90e2']} tintColor={'#4a90e2'} />
         }

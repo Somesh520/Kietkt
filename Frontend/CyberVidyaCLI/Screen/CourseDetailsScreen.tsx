@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, SafeAreaView, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, FlatList, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute } from '@react-navigation/native';
 import { getLectureWiseAttendance, Lecture } from '../api';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -12,7 +13,7 @@ const ShimmerPlaceholder = createShimmerPlaceholder(LinearGradient);
 // --- UI Component for single Lecture Item ---
 const LectureItem = ({ item }: { item: Lecture }) => {
   const isPresent = item.attendance === 'PRESENT';
-  
+
   const [year, month, day] = item.planLecDate.split('-').map(Number);
   const date = new Date(year, month - 1, day, 12);
 
@@ -93,7 +94,7 @@ function CourseDetailsScreen(): React.JSX.Element {
     if (lectures.length === 0) {
       return <Text style={styles.infoText}>No lecture data found for this subject.</Text>;
     }
-    
+
     return (
       <FlatList
         data={lectures}

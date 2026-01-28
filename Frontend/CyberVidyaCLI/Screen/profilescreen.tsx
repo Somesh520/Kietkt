@@ -46,32 +46,32 @@ interface StatusConfigItem {
 }
 
 // --- Constants ---
-const CURRENT_APP_VERSION = "v1.1.3";
+const CURRENT_APP_VERSION = "v1.1.4";
 const UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Somesh520/Kietkt/main/update.json";
 
 // --- Data ---
 const teamMembers: TeamMember[] = [
-  { 
-    name: 'Somesh Tiwari', 
-    role: 'Lead Developer', 
+  {
+    name: 'Somesh Tiwari',
+    role: 'Lead Developer',
     linkedinUrl: 'https://www.linkedin.com/in/somesh-tiwari-236555322/',
-    imageUrl: 'https://api.dicebear.com/9.x/adventurer/png?seed=Somesh&backgroundColor=b6e3f4' 
+    imageUrl: 'https://api.dicebear.com/9.x/adventurer/png?seed=Somesh&backgroundColor=b6e3f4'
   },
-  { 
-    name: 'Aviral Rajput', 
-    role: 'UI/UX Designer', 
+  {
+    name: 'Aviral Rajput',
+    role: 'UI/UX Designer',
     linkedinUrl: 'https://www.linkedin.com/in/aviral-rajput-077a37309/',
     imageUrl: 'https://api.dicebear.com/9.x/adventurer/png?seed=Aviral&backgroundColor=c0aede'
   },
-  { 
-    name: 'Sujal Kumar', 
-    role: 'Contributor', 
+  {
+    name: 'Sujal Kumar',
+    role: 'Contributor',
     linkedinUrl: 'https://www.linkedin.com/in/sujal-kumar-8a31bb320/',
     imageUrl: 'https://api.dicebear.com/9.x/adventurer/png?seed=Sujal&backgroundColor=d1d4f9'
   },
-  { 
-    name: 'Pushkar Garg', 
-    role: 'Contributor', 
+  {
+    name: 'Pushkar Garg',
+    role: 'Contributor',
     linkedinUrl: 'https://www.linkedin.com/in/pushkar-garg-836542328/',
     imageUrl: 'https://api.dicebear.com/9.x/adventurer/png?seed=Pushkar&backgroundColor=ffdfbf'
   },
@@ -124,6 +124,8 @@ export default function ProfileScreen() {
   const slideAnim = useRef(new Animated.Value(50)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
+
+
   // ✅ Fixed Update Logic: Agar version MATCH NAHI KAREGA toh update dikhayega
   const checkUpdates = async () => {
     try {
@@ -133,20 +135,20 @@ export default function ProfileScreen() {
       const latest = manifest.version || CURRENT_APP_VERSION;
       setLatestVersion(latest);
       setDownloadLink(manifest.downloadUrl || '');
-      
+
       const normalize = (v: string) => v.toLowerCase().startsWith('v') ? v.substring(1) : v;
 
       const compareVersions = (v1: string, v2: string) => {
-          const parts1 = normalize(v1).split('.').map(Number);
-          const parts2 = normalize(v2).split('.').map(Number);
-          
-          for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
-              const p1 = parts1[i] || 0;
-              const p2 = parts2[i] || 0;
-              if (p1 > p2) return 1;
-              if (p1 < p2) return -1;
-          }
-          return 0; // Versions match exactly
+        const parts1 = normalize(v1).split('.').map(Number);
+        const parts2 = normalize(v2).split('.').map(Number);
+
+        for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+          const p1 = parts1[i] || 0;
+          const p2 = parts2[i] || 0;
+          if (p1 > p2) return 1;
+          if (p1 < p2) return -1;
+        }
+        return 0; // Versions match exactly
       };
 
       // Check: If versions are NOT EQUAL (!== 0), show update available
@@ -211,17 +213,17 @@ export default function ProfileScreen() {
   return (
     <View style={styles.mainContainer}>
       <StatusBar barStyle="light-content" backgroundColor="#4f46e5" />
-      
+
       <View style={styles.headerContainer}>
-        <Animated.View style={[styles.blob, { 
-            backgroundColor: '#6366f1', top: -50, right: -50, width: 200, height: 200, 
-            transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-100, 0] }) }] 
+        <Animated.View style={[styles.blob, {
+          backgroundColor: '#6366f1', top: -50, right: -50, width: 200, height: 200,
+          transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-100, 0] }) }]
         }]} />
-        <Animated.View style={[styles.blob, { 
-            backgroundColor: '#818cf8', bottom: -80, left: -50, width: 250, height: 250,
-            transform: [{ scale: headerAnim }] 
+        <Animated.View style={[styles.blob, {
+          backgroundColor: '#818cf8', bottom: -80, left: -50, width: 250, height: 250,
+          transform: [{ scale: headerAnim }]
         }]} />
-        
+
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>About App</Text>
           <Text style={styles.headerSubtitle}>Built for Students, by Students.</Text>
@@ -230,7 +232,7 @@ export default function ProfileScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Animated.View style={{ opacity: opacityAnim, transform: [{ translateY: slideAnim }] }}>
-          
+
           {renderUpdateCard()}
 
           <Text style={styles.sectionLabel}>THE CREATORS</Text>
@@ -240,13 +242,13 @@ export default function ProfileScreen() {
                 <ScaleButton onPress={() => handleLinkPress(member.linkedinUrl)}>
                   <View style={styles.row}>
                     {member.imageUrl ? (
-                      <Image 
-                        source={{ uri: member.imageUrl }} 
-                        style={styles.avatarImage} 
+                      <Image
+                        source={{ uri: member.imageUrl }}
+                        style={styles.avatarImage}
                       />
                     ) : (
                       <View style={[styles.iconBox, { backgroundColor: '#c7d2fe' }]}>
-                         <SimpleIcon name="person" color="#fff" />
+                        <SimpleIcon name="person" color="#fff" />
                       </View>
                     )}
 
@@ -289,7 +291,7 @@ export default function ProfileScreen() {
           </View>
 
           <Text style={styles.footer}>Made with ❤️ by Someshxd</Text>
-          <View style={{height: 50}} />
+          <View style={{ height: 50 }} />
 
         </Animated.View>
       </ScrollView>
