@@ -97,6 +97,7 @@ export interface ExamSchedule {
     examMode: string;
     examVenueName: string;
     courseComponentName: string;
+    courseDetails?: string;
 }
 
 export interface ExamSession {
@@ -107,6 +108,38 @@ export interface ExamSession {
 export interface HallTicketOption {
     id: number;
     title: string;
+}
+
+// --- EXAM SCORE / RESULT ---
+
+export interface ExamScoreComponent {
+    courseCompName: string; // e.g., "THEORY", "PRACTICAL"
+    compSessionLevelMarks: {
+        grade: string;
+        result: string;
+        compEgp: number;
+        compCredits: number;
+    }[];
+}
+
+export interface ExamScoreSubject {
+    courseCode: string;
+    courseName: string;
+    courseCompDTOList: ExamScoreComponent[];
+    resultSort: string; // "PASS"
+}
+
+export interface ExamScoreSemester {
+    semesterName: string;
+    sgpa: number;
+    studentMarksDetailsDTO: ExamScoreSubject[];
+}
+
+export interface ExamScoreResponse {
+    studentSemesterWiseMarksDetailsList: ExamScoreSemester[];
+    cgpa: number;
+    fullName: string;
+    enrollmentNo?: string;
 }
 
 // --- API Client and Interceptors ---
@@ -407,5 +440,15 @@ export const downloadHallTicketPDF = async (hallTicketId: number, title: string)
     } catch (err: any) {
         console.error("Download Error:", err);
         throw new Error(err.message || "Failed to download Hall Ticket PDF");
+    }
+};
+
+export const getExamScore = async (): Promise<ExamScoreResponse | null> => {
+    try {
+        const response = await apiClient.get<ApiResponse<ExamScoreResponse>>('/exam/score/get/score');
+        return response.data?.data || null;
+    } catch (err) {
+        console.error("Failed to fetch exam score:", err);
+        return null;
     }
 };

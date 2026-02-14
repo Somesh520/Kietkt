@@ -21,48 +21,90 @@ type LoginProps = {
   onLoginSuccess: (token: string) => void;
 };
 
-// ⚡ AGGRESSIVE SPEED SCRIPT: Block images + Fast login detect
-const FAST_LOGIN_SCRIPT = `
+// 🚀🚀🚀 EXTREME SPEED SCRIPT 🚀🚀🚀
+// 1. Nukes all non-login DOM elements
+// 2. Blocks dynamically loaded scripts
+// 3. Polls for login token
+const EXTREME_SPEED_SCRIPT = `
   (function() {
-    // 1. BLOCK IMAGE LOADING - सबसे पहले ये करो!
-    // Override Image constructor
-    const OriginalImage = window.Image;
-    window.Image = function() {
-      const img = new OriginalImage();
-      Object.defineProperty(img, 'src', {
-        set: function(v) { /* Block */ },
-        get: function() { return ''; }
-      });
-      return img;
-    };
+    // 1. Clear storage (prevent auto-login)
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch(e) {}
 
-    // Stop img tags from loading
-    const observer = new MutationObserver(function(mutations) {
+    // 2. 🔥 NUKE NON-LOGIN ELEMENTS from DOM
+    function stripPage() {
+      // Remove heavy script tags
+      var scripts = document.querySelectorAll('script[src]');
+      scripts.forEach(function(s) {
+        var src = s.src.toLowerCase();
+        if (src.indexOf('jspdf') > -1 || src.indexOf('html2canvas') > -1 ||
+            src.indexOf('mathlive') > -1 || src.indexOf('mathjax') > -1 ||
+            src.indexOf('tabulator') > -1 || src.indexOf('highcharts') > -1 ||
+            src.indexOf('easebuzz') > -1 || src.indexOf('adminlte') > -1 ||
+            src.indexOf('daterangepicker') > -1 || src.indexOf('overlayScrollbars') > -1 ||
+            src.indexOf('moment.min') > -1 || src.indexOf('jquery-ui') > -1 ||
+            src.indexOf('bootstrap-select') > -1 || src.indexOf('d3.v5') > -1 ||
+            src.indexOf('c3.min') > -1) {
+          s.remove();
+        }
+      });
+
+      // Remove unused CSS
+      var links = document.querySelectorAll('link[rel="stylesheet"]');
+      links.forEach(function(l) {
+        var href = (l.href || '').toLowerCase();
+        if (href.indexOf('tabulator') > -1 || href.indexOf('mathlive') > -1 ||
+            href.indexOf('flaticon') > -1 || href.indexOf('icheck') > -1 ||
+            href.indexOf('bootstrap-float-label') > -1 || href.indexOf('bootstrap-select') > -1 ||
+            href.indexOf('c3.css') > -1 || href.indexOf('font-awesome.min.css') > -1) {
+          l.remove();
+        }
+      });
+
+      // Hide sidebar, footer, navbar
+      var sidebar = document.querySelector('.main-sidebar');
+      if (sidebar) sidebar.style.display = 'none';
+      var footer = document.querySelector('.main-footer');
+      if (footer) footer.style.display = 'none';
+      var navbar = document.querySelector('.main-header');
+      if (navbar) navbar.style.display = 'none';
+
+      // Block all images
+      var imgs = document.querySelectorAll('img');
+      imgs.forEach(function(img) { img.src = ''; img.style.display = 'none'; });
+    }
+
+    stripPage();
+    setTimeout(stripPage, 500);
+    setTimeout(stripPage, 1500);
+    setTimeout(stripPage, 3000);
+
+    // 3. 🔒 BLOCK new script injections (MutationObserver)
+    var observer = new MutationObserver(function(mutations) {
       mutations.forEach(function(m) {
         m.addedNodes.forEach(function(node) {
-          if (node.tagName === 'IMG') {
-            node.removeAttribute('src');
-            node.removeAttribute('srcset');
+          if (node.tagName === 'SCRIPT' && node.src) {
+            var src = node.src.toLowerCase();
+            if (src.indexOf('main-es') === -1 && src.indexOf('runtime') === -1 &&
+                src.indexOf('polyfills') === -1 && src.indexOf('scripts.') === -1 &&
+                src.indexOf('recaptcha') === -1 && src.indexOf('jquery.min') === -1 &&
+                src.indexOf('bootstrap.min') === -1 && src.indexOf('popper') === -1) {
+              node.remove();
+            }
           }
         });
       });
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
 
-    // 2. 🔥 ALWAYS Clear Storage on Initial Load (Prevents Auto-Login)
-    try {
-      window.localStorage.clear();
-      window.sessionStorage.clear();
-      console.log('🧹 Storage cleared on page load');
-    } catch(e) {
-      console.log('Clear failed:', e);
-    }
-
-    // 3. Fast Token Polling (200ms)
+    // 4. ⚡ Fast Token Polling (200ms)
     var check = setInterval(function() {
       var token = localStorage.getItem('authenticationtoken');
       if (token && token.length > 5) {
         clearInterval(check);
+        observer.disconnect();
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'LOGIN_DONE', token: token }));
       }
     }, 200);
@@ -73,30 +115,16 @@ const FAST_LOGIN_SCRIPT = `
 const LoginPage = ({ onLoginSuccess }: LoginProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const webViewRef = useRef<WebView>(null);
+  const startTime = useRef(Date.now());
 
-  // 🔥 Clear session on mount to prevent auto-login
-  React.useEffect(() => {
-    const clearSession = async () => {
-      try {
-        // Clear WebView cache and storage
-        webViewRef.current?.clearCache(true);
-
-        // Inject script to clear all storage
-        webViewRef.current?.injectJavaScript(`
-          localStorage.clear();
-          sessionStorage.clear();
-          true;
-        `);
-
-        console.log('✅ WebView session cleared');
-      } catch (e) {
-        console.log('Failed to clear session:', e);
-      }
-    };
-
-    // Small delay to ensure WebView is ready
-    setTimeout(clearSession, 500);
-  }, []);
+  // 🧹 Clears storage BEFORE Angular boots (prevents 404 after logout)
+  const CLEAR_BEFORE_LOAD = `
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch(e) {}
+    true;
+  `;
 
   const handleMessage = async (event: any) => {
     try {
@@ -106,9 +134,14 @@ const LoginPage = ({ onLoginSuccess }: LoginProps) => {
         if (finalToken.startsWith('"')) finalToken = JSON.parse(finalToken);
         if (!finalToken.includes('GlobalEducation')) finalToken = `GlobalEducation ${finalToken}`;
 
-        // 🚀 INSTANT ACTION: No Animation Wait
         await AsyncStorage.setItem('authToken', finalToken);
         logEvent(getAnalytics(), 'login_success', { method: 'rocket_mode' });
+
+        const endTime = Date.now();
+        const duration = (endTime - startTime.current) / 1000;
+        console.log(`\n\n⏱️⏱️⏱️ LOGIN TOOK: ${duration} seconds ⏱️⏱️⏱️\n\n`);
+
+        setIsLoading(false); // Hide Loader
         onLoginSuccess(finalToken);
       }
     } catch (e) { }
@@ -136,18 +169,16 @@ const LoginPage = ({ onLoginSuccess }: LoginProps) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>CyberVidya (Lite Mode) ⚡</Text>
       </View>
 
       <View style={styles.webViewContainer}>
 
-        {/* Loader jo turant hatt jayega */}
         {isLoading && (
           <View style={styles.loaderContainer}>
             <ActivityIndicator size="large" color="#2980b9" />
-            <Text style={styles.loadingText}>Connecting...</Text>
+            <Text style={styles.loadingText}>Loading Login...</Text>
           </View>
         )}
 
@@ -155,28 +186,32 @@ const LoginPage = ({ onLoginSuccess }: LoginProps) => {
           ref={webViewRef}
           source={{ uri: LOGIN_URL }}
           style={styles.webView}
-          injectedJavaScript={FAST_LOGIN_SCRIPT}
+          injectedJavaScriptBeforeContentLoaded={CLEAR_BEFORE_LOAD}
+          injectedJavaScript={EXTREME_SPEED_SCRIPT}
           onMessage={handleMessage}
 
-          // 🔥🔥 THE SPEED HACKS 🔥🔥
-          // blockNetworkImage={true}         // 1. Images Block (Sabse Tez)
-          cacheEnabled={true}              // 2. Cache On
-          cacheMode="LOAD_CACHE_ELSE_NETWORK" // 3. Agar cache hai, to net mat use karo
+          // @ts-ignore
+          blockNetworkImage={true}
+          cacheEnabled={true}
+          cacheMode="LOAD_CACHE_ELSE_NETWORK"
 
           userAgent={USER_AGENT}
           javaScriptEnabled={true}
           domStorageEnabled={true}
-          androidLayerType="hardware"      // 4. GPU Acceleration
+          androidLayerType="hardware"
           overScrollMode="never"
+          startInLoadingState={false}
+          showsHorizontalScrollIndicator={false}
+          showsVerticalScrollIndicator={false}
 
-          // 🚀 Aggressive Loader Hiding
           onLoadProgress={({ nativeEvent }) => {
-            // Wait for 75% load to avoid partial rendering
-            if (nativeEvent.progress > 0.75) setIsLoading(false);
+            // Keep loading until we actually get the token or user interacts
+            if (nativeEvent.progress > 0.8) {
+              // Optional: Can hide if taking too long, but better to wait for token
+            }
           }}
         />
 
-        {/* Reload Button (Agar atak jaye) */}
         {!isLoading && (
           <TouchableOpacity style={styles.reloadBtn} onPress={handleReload} onLongPress={handleClearCache}>
             <Icon name="refresh" size={24} color="#fff" />
@@ -195,8 +230,8 @@ const styles = StyleSheet.create({
   webViewContainer: { flex: 1 },
   webView: { flex: 1 },
 
-  loaderContainer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', zIndex: 10 },
-  loadingText: { marginTop: 10, color: '#555' },
+  loaderContainer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', zIndex: 100 },
+  loadingText: { marginTop: 20, color: '#2980b9', fontWeight: 'bold', fontSize: 16 },
 
   reloadBtn: {
     position: 'absolute', bottom: 30, right: 30,

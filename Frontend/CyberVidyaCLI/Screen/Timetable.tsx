@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getWeeklySchedule, TimetableEvent } from '../api';
 import Icon from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
+import { useTheme } from '../ThemeContext';
 
 // --- Helper Functions ---
 const formatDateKey = (date: Date): string => {
@@ -94,35 +95,39 @@ const Shimmer = () => {
   );
 };
 
-const SkeletonCard = () => (
-  <View style={[itemStyles.card, { backgroundColor: '#E0E0E0', overflow: 'hidden' }]}>
-    <View style={itemStyles.detailsContainer}>
-      <View style={{ height: 14, width: '40%', backgroundColor: '#BDBDBD', borderRadius: 4 }} />
-      <View style={{ height: 18, width: '80%', backgroundColor: '#BDBDBD', borderRadius: 4, marginTop: 10 }} />
+const SkeletonCard = () => {
+  const { colors, isDark } = useTheme();
+  return (
+    <View style={[itemStyles.card, { backgroundColor: isDark ? '#333' : '#E0E0E0', overflow: 'hidden' }]}>
+      <View style={[itemStyles.detailsContainer, { backgroundColor: colors.card }]}>
+        <View style={{ height: 14, width: '40%', backgroundColor: isDark ? '#555' : '#BDBDBD', borderRadius: 4 }} />
+        <View style={{ height: 18, width: '80%', backgroundColor: isDark ? '#555' : '#BDBDBD', borderRadius: 4, marginTop: 10 }} />
+      </View>
+      <Shimmer />
     </View>
-    <Shimmer />
-  </View>
-);
+  );
+};
 
 // --- Class Card ---
 const ClassCard = ({ item }: { item: TimetableEvent }) => {
+  const { colors, isDark } = useTheme();
   const startTime = formatTime(parseCustomDate(item.start));
   const endTime = formatTime(parseCustomDate(item.end));
   return (
     <View style={itemStyles.card}>
       <View style={itemStyles.timelineContainer}>
-        <View style={[itemStyles.iconContainer, { backgroundColor: '#dbeafe' }]}>
-          <Icon name="book-outline" size={20} color="#2563eb" />
+        <View style={[itemStyles.iconContainer, { backgroundColor: isDark ? '#1e3a8a' : '#dbeafe' }]}>
+          <Icon name="book-outline" size={20} color={isDark ? '#60a5fa' : '#2563eb'} />
         </View>
-        <View style={itemStyles.timelineLine} />
+        <View style={[itemStyles.timelineLine, { backgroundColor: colors.border }]} />
       </View>
-      <View style={itemStyles.detailsContainer}>
-        <Text style={itemStyles.timeText}>{startTime} - {endTime}</Text>
-        <Text style={itemStyles.courseName}>{item.courseName}</Text>
-        <Text style={itemStyles.facultyName}>{item.facultyName}</Text>
-        <View style={itemStyles.footerContainer}>
-          <Icon name="location-outline" size={16} color="#7f8c8d" />
-          <Text style={itemStyles.footerText}>{item.classRoom || 'N/A'}</Text>
+      <View style={[itemStyles.detailsContainer, { backgroundColor: colors.card }]}>
+        <Text style={[itemStyles.timeText, { color: colors.primary }]}>{startTime} - {endTime}</Text>
+        <Text style={[itemStyles.courseName, { color: colors.text }]}>{item.courseName}</Text>
+        <Text style={[itemStyles.facultyName, { color: colors.subText }]}>{item.facultyName}</Text>
+        <View style={[itemStyles.footerContainer, { borderTopColor: colors.border }]}>
+          <Icon name="location-outline" size={16} color={colors.subText} />
+          <Text style={[itemStyles.footerText, { color: colors.subText }]}>{item.classRoom || 'N/A'}</Text>
         </View>
       </View>
     </View>
@@ -206,6 +211,7 @@ const HolidayCard = ({ item }: { item: TimetableEvent }) => {
 
 // --- Empty Schedule State ---
 const EmptyScheduleState = () => {
+  const { colors } = useTheme();
   const floatAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.loop(
@@ -219,10 +225,10 @@ const EmptyScheduleState = () => {
   return (
     <View style={styles.centerContainer}>
       <Animated.View style={{ transform: [{ translateY: floatAnim }] }}>
-        <Icon name="bed-outline" size={100} color="#BDC3C7" />
+        <Icon name="bed-outline" size={100} color={colors.subText} />
       </Animated.View>
-      <Text style={styles.emptyTextTitle}>No Schedule Found</Text>
-      <Text style={styles.emptyTextSubtitle}>Select another date or enjoy your day!</Text>
+      <Text style={[styles.emptyTextTitle, { color: colors.subText }]}>No Schedule Found</Text>
+      <Text style={[styles.emptyTextSubtitle, { color: colors.subText }]}>Select another date or enjoy your day!</Text>
     </View>
   );
 };
@@ -233,7 +239,7 @@ function TimetableScreen(): React.JSX.Element {
   const [sections, setSections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [calendarDays, setCalendarDays] = useState<Date[]>([]);
   const [selectedDateKey, setSelectedDateKey] = useState<string>(formatDateKey(new Date()));
 
@@ -265,11 +271,13 @@ function TimetableScreen(): React.JSX.Element {
     }
   }, [selectedDateKey, allEvents]);
 
+  const { colors, isDark } = useTheme();
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.headerContainer}>
-            <Text style={styles.mainTitle}>Schedule</Text>
+          <Text style={[styles.mainTitle, { color: colors.text }]}>Schedule</Text>
         </View>
         <ScrollView contentContainerStyle={styles.listContentContainer} showsVerticalScrollIndicator={false}>
           <SkeletonCard />
@@ -281,10 +289,10 @@ function TimetableScreen(): React.JSX.Element {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.headerContainer}>
-        <Text style={styles.mainTitle}>Schedule</Text>
-        <Text style={styles.dateSubtitle}>{formatSectionHeaderDate(selectedDateKey)}</Text>
+        <Text style={[styles.mainTitle, { color: colors.text }]}>Schedule</Text>
+        <Text style={[styles.dateSubtitle, { color: colors.subText }]}>{formatSectionHeaderDate(selectedDateKey)}</Text>
       </View>
 
       <View style={styles.calendarContainer}>
@@ -297,15 +305,19 @@ function TimetableScreen(): React.JSX.Element {
           renderItem={({ item }) => {
             const dateKey = formatDateKey(item);
             const isSelected = selectedDateKey === dateKey;
-            
+
             return (
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => setSelectedDateKey(dateKey)}
-                style={[styles.dateItem, isSelected && styles.dateItemSelected]}
+                style={[
+                  styles.dateItem,
+                  { backgroundColor: isSelected ? colors.primary : colors.card },
+                  isSelected && styles.dateItemSelected
+                ]}
               >
-                <Text style={[styles.dayText, isSelected && styles.textSelected]}>{getDayName(item)}</Text>
-                <Text style={[styles.dateNumText, isSelected && styles.textSelected]}>{getDayNumber(item)}</Text>
+                <Text style={[styles.dayText, { color: isSelected ? 'white' : colors.subText }]}>{getDayName(item)}</Text>
+                <Text style={[styles.dateNumText, { color: isSelected ? 'white' : colors.text }]}>{getDayNumber(item)}</Text>
                 {isSelected && <View style={styles.activeDot} />}
               </TouchableOpacity>
             );
@@ -314,7 +326,7 @@ function TimetableScreen(): React.JSX.Element {
       </View>
 
       <SectionList
-        style={{ flex: 1 }} 
+        style={{ flex: 1 }}
         sections={sections}
         keyExtractor={(item, index) => item.start + index}
         renderItem={({ item }) => {
@@ -322,11 +334,11 @@ function TimetableScreen(): React.JSX.Element {
           if (item.type === 'HOLIDAY') return <HolidayCard item={item} />;
           return null;
         }}
-        renderSectionHeader={() => <View style={{height: 10}} />} 
+        renderSectionHeader={() => <View style={{ height: 10 }} />}
         ListEmptyComponent={<EmptyScheduleState />}
         contentContainerStyle={[
-            styles.listContentContainer, 
-            sections.length === 0 && styles.centerEmptyContent 
+          styles.listContentContainer,
+          sections.length === 0 && styles.centerEmptyContent
         ]}
         stickySectionHeadersEnabled={false}
       />
@@ -336,7 +348,7 @@ function TimetableScreen(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f6f8' },
-  
+
   headerContainer: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 5 },
   mainTitle: { fontSize: 30, fontWeight: 'bold', color: '#2c3e50' },
   dateSubtitle: { fontSize: 16, color: '#7f8c8d', fontWeight: '500', marginTop: 2 },
@@ -368,9 +380,9 @@ const styles = StyleSheet.create({
 
   centerContainer: { alignItems: 'center', justifyContent: 'center', padding: 20 },
   centerEmptyContent: { flexGrow: 1, justifyContent: 'center' },
-  
+
   errorText: { color: '#c0392b', fontSize: 16, textAlign: 'center', marginTop: 10 },
-  
+
   emptyTextTitle: { fontSize: 20, fontWeight: 'bold', color: '#7f8c8d', marginTop: 20 },
   emptyTextSubtitle: { fontSize: 15, color: '#bdc3c7', marginTop: 5 },
 
@@ -384,7 +396,7 @@ const itemStyles = StyleSheet.create({
   iconContainer: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', zIndex: 1, backgroundColor: 'white' },
   timelineLine: { flex: 1, width: 2, backgroundColor: '#e0e0e0', marginTop: -10, marginBottom: -10 },
   detailsContainer: { flex: 1, backgroundColor: 'white', borderRadius: 12, padding: 15, elevation: 2, shadowColor: '#95a5a6', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, marginBottom: 15 },
-  
+
   timeText: { fontSize: 14, color: '#2980b9', fontWeight: '600', marginBottom: 6 },
   courseName: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50', marginBottom: 4 },
   facultyName: { fontSize: 15, color: '#7f8c8d' },

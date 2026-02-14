@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { getExamSession, getHallTicketOptions, downloadHallTicketPDF, getRegisteredCourses } from '../api';
+import { useTheme } from '../ThemeContext';
 
 const HallTicketScreen = () => {
   const [loading, setLoading] = useState(false);
@@ -96,27 +97,29 @@ const HallTicketScreen = () => {
     }
   };
 
+  const { colors, isDark } = useTheme();
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
 
       {/* ✅ SESSION SELECTOR DROPDOWN */}
-      <View style={styles.selectorContainer}>
-        <Text style={styles.label}>Select Academic Session:</Text>
+      <View style={[styles.selectorContainer, { backgroundColor: colors.card }]}>
+        <Text style={[styles.label, { color: colors.subText }]}>Select Academic Session:</Text>
         <TouchableOpacity
-          style={styles.dropdown}
+          style={[styles.dropdown, { borderColor: colors.border, backgroundColor: isDark ? colors.background : '#fafafa' }]}
           onPress={() => setSessionList.length > 0 && setModalVisible(true)}
         >
-          <Text style={styles.dropdownText}>
+          <Text style={[styles.dropdownText, { color: colors.text }]}>
             {selectedSession ? selectedSession.sessionName : "Select Session"}
           </Text>
-          <Icon name="chevron-down" size={20} color="#555" />
+          <Icon name="chevron-down" size={20} color={colors.subText} />
         </TouchableOpacity>
       </View>
 
       {/* Main Content */}
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#2980b9" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -125,24 +128,24 @@ const HallTicketScreen = () => {
           contentContainerStyle={{ padding: 20 }}
           ListEmptyComponent={
             <View style={styles.center}>
-              <Icon name="documents-outline" size={60} color="#ccc" />
-              <Text style={styles.emptyText}>No Hall Tickets Found</Text>
-              <Text style={styles.subEmptyText}>
+              <Icon name="documents-outline" size={60} color={colors.subText} />
+              <Text style={[styles.emptyText, { color: colors.subText }]}>No Hall Tickets Found</Text>
+              <Text style={[styles.subEmptyText, { color: colors.subText }]}>
                 for {selectedSession?.sessionName || 'this session'}
               </Text>
             </View>
           }
           renderItem={({ item }) => (
-            <View style={styles.card}>
-              <View style={styles.iconContainer}>
-                <Icon name="document-text" size={30} color="#2980b9" />
+            <View style={[styles.card, { backgroundColor: colors.card }]}>
+              <View style={[styles.iconContainer, { backgroundColor: isDark ? '#1e3a8a' : '#eff6ff' }]}>
+                <Icon name="document-text" size={30} color={isDark ? '#60a5fa' : '#2980b9'} />
               </View>
               <View style={styles.info}>
-                <Text style={styles.cardTitle}>{item.title}</Text>
-                <Text style={styles.cardSub}>PDF Available</Text>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
+                <Text style={[styles.cardSub, { color: colors.subText }]}>PDF Available</Text>
               </View>
               <TouchableOpacity
-                style={styles.downloadBtn}
+                style={[styles.downloadBtn, { backgroundColor: colors.primary }]}
                 onPress={() => handleDownload(item)}
               >
                 <Icon name="download-outline" size={24} color="#fff" />
@@ -159,12 +162,12 @@ const HallTicketScreen = () => {
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Choose Session</Text>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalVisible(false)}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <View style={[styles.modalHeader, { borderColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Choose Session</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Icon name="close" size={24} color="#333" />
+                <Icon name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -175,24 +178,26 @@ const HallTicketScreen = () => {
                 <TouchableOpacity
                   style={[
                     styles.modalItem,
-                    selectedSession?.sessionId === item.sessionId && styles.modalItemActive
+                    { borderColor: colors.border },
+                    selectedSession?.sessionId === item.sessionId && { backgroundColor: isDark ? '#1e3a8a' : '#eff6ff' }
                   ]}
                   onPress={() => handleSessionChange(item)}
                 >
                   <Text style={[
                     styles.modalItemText,
-                    selectedSession?.sessionId === item.sessionId && styles.modalItemTextActive
+                    { color: colors.text },
+                    selectedSession?.sessionId === item.sessionId && { color: colors.primary, fontWeight: 'bold' }
                   ]}>
                     {item.sessionName}
                   </Text>
                   {selectedSession?.sessionId === item.sessionId && (
-                    <Icon name="checkmark-circle" size={20} color="#2980b9" />
+                    <Icon name="checkmark-circle" size={20} color={colors.primary} />
                   )}
                 </TouchableOpacity>
               )}
             />
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
 
     </SafeAreaView>

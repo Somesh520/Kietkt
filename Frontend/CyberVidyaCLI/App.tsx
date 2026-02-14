@@ -13,11 +13,12 @@ import axios from 'axios';
 import {
   getAnalytics,
   logEvent,
-  logScreenView,
   setUserId,
   setUserProperties,
   resetAnalyticsData
 } from '@react-native-firebase/analytics';
+
+import { ThemeProvider, useTheme } from './ThemeContext';
 
 import LoginPage from './Screen/Login';
 import HomeScreen from './Screen/Home';
@@ -28,9 +29,11 @@ import ExamScheduleScreen from './Screen/Exams';
 import HallTicketScreen from './Screen/HallTicketScreen';
 import SplashScreen from './Screen/SplashScreen';
 import { logout, onAuthError } from './api';
+import NotificationService from './services/NotificationService';
+import AttendanceScheduler from './services/AttendanceScheduler';
 
 const AUTH_TOKEN_KEY = 'authToken';
-const CURRENT_APP_VERSION = "v1.1.4";
+const CURRENT_APP_VERSION = "v1.1.5";
 const UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Somesh520/Kietkt/main/update.json";
 
 const Tab = createBottomTabNavigator();
@@ -43,32 +46,33 @@ type AuthProps = {
 // --- Custom Exam Manager ---
 function ExamManagerScreen() {
   const [viewMode, setViewMode] = useState<'schedule' | 'ticket'>('schedule');
+  const { colors, isDark } = useTheme();
 
   return (
-    <SafeAreaView style={styles.examContainer}>
-      <View style={styles.toggleContainer}>
+    <SafeAreaView style={[styles.examContainer, { backgroundColor: colors.background }]}>
+      <View style={[styles.toggleContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity
-          style={[styles.toggleBtn, viewMode === 'schedule' && styles.toggleBtnActive]}
+          style={[styles.toggleBtn, viewMode === 'schedule' && { borderBottomColor: colors.primary }]}
           onPress={async () => {
             setViewMode('schedule');
             await logEvent(getAnalytics(), 'select_content', { content_type: 'exam_tab', item_id: 'datesheet' });
           }}
         >
-          <Text style={[styles.toggleText, viewMode === 'schedule' && styles.toggleTextActive]}>Datesheet</Text>
+          <Text style={[styles.toggleText, { color: colors.subText }, viewMode === 'schedule' && { color: colors.primary, fontWeight: 'bold' }]}>Datesheet</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.toggleBtn, viewMode === 'ticket' && styles.toggleBtnActive]}
+          style={[styles.toggleBtn, viewMode === 'ticket' && { borderBottomColor: colors.primary }]}
           onPress={async () => {
             setViewMode('ticket');
             await logEvent(getAnalytics(), 'select_content', { content_type: 'exam_tab', item_id: 'hall_ticket' });
           }}
         >
-          <Text style={[styles.toggleText, viewMode === 'ticket' && styles.toggleTextActive]}>Hall Ticket</Text>
+          <Text style={[styles.toggleText, { color: colors.subText }, viewMode === 'ticket' && { color: colors.primary, fontWeight: 'bold' }]}>Hall Ticket</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={{ flex: 1, backgroundColor: '#f4f6f8' }}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         {viewMode === 'schedule' ? <ExamScheduleScreen /> : <HallTicketScreen />}
       </View>
     </SafeAreaView>
@@ -76,21 +80,29 @@ function ExamManagerScreen() {
 }
 
 function MainAppTabs({ onLogout }: AuthProps) {
+  const { colors, isDark } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
+        tabBarIcon: ({ focused, size }) => {
           let iconName: string = '';
           if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
           else if (route.name === 'Timetable') iconName = focused ? 'calendar' : 'calendar-outline';
           else if (route.name === 'Exams') iconName = focused ? 'school' : 'school-outline';
           else if (route.name === 'About us') iconName = focused ? 'person-circle' : 'person-circle-outline';
-          return <Icon name={iconName} size={size} color={color} />;
+          return <Icon name={iconName} size={size} color={focused ? colors.primary : colors.subText} />;
         },
-        tabBarActiveTintColor: '#2980b9',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.subText,
         headerShown: false,
-        tabBarStyle: { height: 60, paddingBottom: 5, paddingTop: 5, backgroundColor: '#ffffff', borderTopWidth: 0, elevation: 5 },
+        tabBarStyle: {
+          height: 60,
+          paddingBottom: 5,
+          paddingTop: 5,
+          backgroundColor: colors.tabBar,
+          borderTopWidth: 0,
+          elevation: 5
+        },
         tabBarLabelStyle: { fontSize: 12 },
         tabBarHideOnKeyboard: true,
       })}
@@ -104,8 +116,19 @@ function MainAppTabs({ onLogout }: AuthProps) {
 }
 
 function AppStack({ onLogout }: AuthProps) {
+  const { colors, isDark } = useTheme();
   return (
-    <Stack.Navigator>
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: colors.card,
+        },
+        headerTintColor: colors.text,
+        headerTitleStyle: {
+          fontWeight: 'bold',
+        },
+      }}
+    >
       <Stack.Screen
         name="MainTabs"
         children={() => <MainAppTabs onLogout={onLogout} />}
@@ -125,7 +148,7 @@ const compareVersions = (v1: string, v2: string) => {
   const normalize = (v: string) => v.toLowerCase().startsWith('v') ? v.substring(1) : v;
   const parts1 = normalize(v1).split('.').map(Number);
   const parts2 = normalize(v2).split('.').map(Number);
-
+  // @ts-ignore
   for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
     const p1 = parts1[i] || 0;
     const p2 = parts2[i] || 0;
@@ -194,6 +217,33 @@ function App(): React.JSX.Element {
     checkToken();
   }, []);
 
+
+
+  // ...
+
+  // 3. Notification Initialization & SMART REFRESH
+  useEffect(() => {
+    const initNotifications = async () => {
+      console.log('🚀 initNotifications called');
+      const hasPermission = await NotificationService.requestUserPermission();
+      if (hasPermission) {
+        await NotificationService.getFCMToken();
+        // 🗓️ Schedule Initial
+        await AttendanceScheduler.scheduleNotifications();
+      }
+    };
+
+    initNotifications();
+    const unsubscribe = NotificationService.listen();
+
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        // @ts-ignore
+        unsubscribe();
+      }
+    };
+  }, []);
+
   // 2. 🚀 UPDATE CHECK (Pop-up Alert Logic)
   useEffect(() => {
     const checkUpdatesAndShowAlert = async () => {
@@ -230,7 +280,7 @@ function App(): React.JSX.Element {
         if (error.response && error.response.status === 404) {
           console.log("ℹ️ No update manifest found (404). Details suppressed.");
         } else {
-          console.warn("Failed to check for updates:", error);
+          // console.warn("Failed to check for updates:", error);
         }
         // Network error hone par koi Alert nahi dikhayenge, App ko chalne denge.
       }
@@ -287,49 +337,70 @@ function App(): React.JSX.Element {
     }
   };
 
+  const { colors, isDark } = useTheme();
+
   return (
     <SafeAreaProvider>
-      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+      <StatusBar
+        translucent
+        backgroundColor="transparent"
+        barStyle={isDark ? "light-content" : "dark-content"}
+      />
 
-      {!isLoading && (
-        <NavigationContainer
-          ref={navigationRef}
-          onReady={() => { routeNameRef.current = navigationRef.getCurrentRoute()?.name; }}
-          onStateChange={async () => {
-            const previousRouteName = routeNameRef.current;
-            const currentRouteName = navigationRef.getCurrentRoute()?.name ?? 'Unknown';
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
 
-            if (previousRouteName !== currentRouteName) {
-              await logScreenView(getAnalytics(), {
-                screen_name: currentRouteName,
-                screen_class: currentRouteName,
-              });
-              if (currentRouteName === 'Timetable') {
-                await logEvent(getAnalytics(), 'check_timetable', { day: new Date().getDay() });
+        {!isLoading && (
+          <NavigationContainer
+            ref={navigationRef}
+            onReady={() => { routeNameRef.current = navigationRef.getCurrentRoute()?.name; }}
+            onStateChange={async () => {
+              const previousRouteName = routeNameRef.current;
+              const currentRouteName = navigationRef.getCurrentRoute()?.name ?? 'Unknown';
+
+              if (previousRouteName !== currentRouteName) {
+                // ⚠️ Fix: logScreenView is deprecated. Use logEvent('screen_view') instead.
+                await logEvent(getAnalytics(), 'screen_view', {
+                  screen_name: currentRouteName,
+                  screen_class: currentRouteName,
+                });
+
+                if (currentRouteName === 'Timetable') {
+                  await logEvent(getAnalytics(), 'check_timetable', { day: new Date().getDay() });
+                }
               }
-            }
-            routeNameRef.current = currentRouteName;
-          }}
-        >
-          <SafeAreaView style={styles.safeArea}>
-            {authToken ? (
-              <AppStack onLogout={handleLogout} />
-            ) : (
-              <LoginPage onLoginSuccess={handleLoginSuccess} />
-            )}
-          </SafeAreaView>
-        </NavigationContainer>
-      )}
+              routeNameRef.current = currentRouteName;
+            }}
+          >
+            <SafeAreaView style={styles.safeArea}>
+              {authToken ? (
+                <AppStack onLogout={handleLogout} />
+              ) : (
+                <LoginPage onLoginSuccess={handleLoginSuccess} />
+              )}
+            </SafeAreaView>
+          </NavigationContainer>
+        )}
 
-      {showSplash && (
-        <View style={styles.splashContainer}>
-          <SplashScreen onFinish={handleSplashFinish} />
-        </View>
-      )}
+        {showSplash && (
+          <View style={styles.splashContainer}>
+            <SplashScreen onFinish={handleSplashFinish} />
+          </View>
+        )}
 
+      </View>
     </SafeAreaProvider>
   );
 }
+
+function AppWithTheme() {
+  return (
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
+  );
+}
+
+export default AppWithTheme;
 
 const styles = StyleSheet.create({
   splashContainer: {
@@ -346,5 +417,3 @@ const styles = StyleSheet.create({
   toggleTextActive: { color: '#2980b9', fontWeight: 'bold' },
   container: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });
-
-export default App;

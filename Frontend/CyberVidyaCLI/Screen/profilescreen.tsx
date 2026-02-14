@@ -15,6 +15,7 @@ import {
   StyleProp,
 } from 'react-native';
 import axios from 'axios';
+import { useTheme } from '../ThemeContext';
 
 // --- Types & Interfaces ---
 interface TeamMember {
@@ -46,7 +47,7 @@ interface StatusConfigItem {
 }
 
 // --- Constants ---
-const CURRENT_APP_VERSION = "v1.1.4";
+const CURRENT_APP_VERSION = "v1.1.5";
 const UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Somesh520/Kietkt/main/update.json";
 
 // --- Data ---
@@ -119,6 +120,7 @@ export default function ProfileScreen() {
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('checking');
   const [latestVersion, setLatestVersion] = useState<string>(CURRENT_APP_VERSION);
   const [downloadLink, setDownloadLink] = useState<string>('');
+  const { colors, isDark } = useTheme();
 
   const headerAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -192,10 +194,12 @@ export default function ProfileScreen() {
     const config = statusMap[updateStatus];
 
     return (
-      <ScaleButton onPress={handleUpdatePress} style={styles.card}>
+      <ScaleButton onPress={handleUpdatePress} style={[styles.card, { backgroundColor: colors.card }]}>
         <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>App Version</Text>
-          <View style={styles.badge}><Text style={styles.badgeText}>{CURRENT_APP_VERSION}</Text></View>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>App Version</Text>
+          <View style={[styles.badge, { backgroundColor: isDark ? '#333' : '#f3f4f6' }]}>
+            <Text style={[styles.badgeText, { color: colors.subText }]}>{CURRENT_APP_VERSION}</Text>
+          </View>
         </View>
         <View style={[styles.statusRow, { backgroundColor: config.bg }]}>
           {updateStatus === 'checking' ? (
@@ -211,7 +215,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={styles.mainContainer}>
+    <View style={[styles.mainContainer, { backgroundColor: colors.background }]}>
       <StatusBar barStyle="light-content" backgroundColor="#4f46e5" />
 
       <View style={styles.headerContainer}>
@@ -236,7 +240,7 @@ export default function ProfileScreen() {
           {renderUpdateCard()}
 
           <Text style={styles.sectionLabel}>THE CREATORS</Text>
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
             {teamMembers.map((member, index) => (
               <View key={member.name}>
                 <ScaleButton onPress={() => handleLinkPress(member.linkedinUrl)}>
@@ -244,7 +248,7 @@ export default function ProfileScreen() {
                     {member.imageUrl ? (
                       <Image
                         source={{ uri: member.imageUrl }}
-                        style={styles.avatarImage}
+                        style={[styles.avatarImage, { backgroundColor: isDark ? '#333' : '#eee' }]}
                       />
                     ) : (
                       <View style={[styles.iconBox, { backgroundColor: '#c7d2fe' }]}>
@@ -253,39 +257,39 @@ export default function ProfileScreen() {
                     )}
 
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.rowTitle}>{member.name}</Text>
-                      <Text style={styles.rowSub}>{member.role}</Text>
+                      <Text style={[styles.rowTitle, { color: colors.text }]}>{member.name}</Text>
+                      <Text style={[styles.rowSub, { color: colors.subText }]}>{member.role}</Text>
                     </View>
                     <SimpleIcon name="linkedin" color="#0077b5" />
                   </View>
                 </ScaleButton>
-                {index < teamMembers.length - 1 && <View style={styles.divider} />}
+                {index < teamMembers.length - 1 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
               </View>
             ))}
           </View>
 
           <Text style={styles.sectionLabel}>INFORMATION</Text>
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.card }]}>
             <View style={styles.row}>
-              <View style={[styles.iconBox, { backgroundColor: '#d1fae5' }]}>
+              <View style={[styles.iconBox, { backgroundColor: isDark ? '#064e3b' : '#d1fae5' }]}>
                 <SimpleIcon name="shield" color="#10b981" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>100% Secure</Text>
-                <Text style={styles.rowSub}>Data is fetched directly from CyberVidya.</Text>
+                <Text style={[styles.rowTitle, { color: colors.text }]}>100% Secure</Text>
+                <Text style={[styles.rowSub, { color: colors.subText }]}>Data is fetched directly from CyberVidya.</Text>
               </View>
             </View>
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <ScaleButton onPress={() => handleLinkPress('https://github.com/Somesh520/Kietkt')}>
               <View style={styles.row}>
-                <View style={[styles.iconBox, { backgroundColor: '#e5e7eb' }]}>
-                  <SimpleIcon name="github" color="#1f2937" />
+                <View style={[styles.iconBox, { backgroundColor: isDark ? '#374151' : '#e5e7eb' }]}>
+                  <SimpleIcon name="github" color={isDark ? '#fff' : '#1f2937'} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle}>Open Source</Text>
-                  <Text style={styles.rowSub}>View code on GitHub</Text>
+                  <Text style={[styles.rowTitle, { color: colors.text }]}>Open Source</Text>
+                  <Text style={[styles.rowSub, { color: colors.subText }]}>View code on GitHub</Text>
                 </View>
-                <SimpleIcon name="arrow-right" color="#ccc" />
+                <SimpleIcon name="arrow-right" color={colors.subText} />
               </View>
             </ScaleButton>
           </View>

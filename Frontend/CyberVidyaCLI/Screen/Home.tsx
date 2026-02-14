@@ -35,6 +35,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay } from 'react-native-reanimated';
 import { createShimmerPlaceholder } from 'react-native-shimmer-placeholder';
+import { useTheme } from '../ThemeContext';
 
 // LiveTracker removed
 
@@ -71,14 +72,15 @@ const getAttendanceInfo = (present: number, total: number) => {
 
 const SmartSummary = ({ present, total }: { present: number, total: number }) => {
   const { status, message } = getAttendanceInfo(present, total);
+  const { colors, isDark } = useTheme();
 
   if (total === 0) {
     return (
-      <View style={styles.summaryBox}>
-        <Icon name="hourglass-outline" size={30} color="#348b9f" />
+      <View style={[styles.summaryBox, { backgroundColor: isDark ? 'rgba(52, 139, 159, 0.2)' : 'rgba(232, 245, 233, 0.8)' }]}>
+        <Icon name="hourglass-outline" size={30} color={colors.primary} />
         <View style={styles.summaryContent}>
-          <Text style={styles.summaryStatusText}>Classes Haven't Started</Text>
-          <Text style={styles.summaryDetailText}>{message}</Text>
+          <Text style={[styles.summaryStatusText, { color: colors.text }]}>Classes Haven't Started</Text>
+          <Text style={[styles.summaryDetailText, { color: colors.subText }]}>{message}</Text>
         </View>
       </View>
     );
@@ -87,25 +89,25 @@ const SmartSummary = ({ present, total }: { present: number, total: number }) =>
   if (status === 'safe') {
     const canMiss = Math.floor(present / 0.75 - total);
     return (
-      <View style={styles.summaryBox}>
-        <Icon name="shield-checkmark" size={40} color="#27ae60" />
+      <View style={[styles.summaryBox, { backgroundColor: isDark ? 'rgba(39, 174, 96, 0.2)' : 'rgba(232, 245, 233, 0.8)' }]}>
+        <Icon name="shield-checkmark" size={40} color={colors.success} />
         <View style={styles.summaryContent}>
-          <Text style={styles.summaryStatusText}>Attendance is Safe</Text>
+          <Text style={[styles.summaryStatusText, { color: colors.text }]}>Attendance is Safe</Text>
           {canMiss > 0 ? (
-            <Text style={styles.canMissText}>You can miss {canMiss} more classes.</Text>
+            <Text style={[styles.canMissText, { color: colors.success }]}>You can miss {canMiss} more classes.</Text>
           ) : (
-            <Text style={styles.summaryDetailText}>Don't miss any classes to stay above 75%.</Text>
+            <Text style={[styles.summaryDetailText, { color: colors.subText }]}>Don't miss any classes to stay above 75%.</Text>
           )}
         </View>
       </View>
     );
   } else {
     return (
-      <View style={[styles.summaryBox, styles.summaryBoxWarning]}>
-        <Icon name="warning" size={40} color={status === 'danger' ? '#c0392b' : '#f39c12'} />
+      <View style={[styles.summaryBox, styles.summaryBoxWarning, { backgroundColor: isDark ? 'rgba(243, 156, 18, 0.2)' : 'rgba(255, 243, 224, 0.8)' }]}>
+        <Icon name="warning" size={40} color={status === 'danger' ? colors.danger : colors.warning} />
         <View style={styles.summaryContent}>
-          <Text style={styles.summaryStatusText}>Action Required!</Text>
-          <Text style={styles.summaryDetailText}>{message}</Text>
+          <Text style={[styles.summaryStatusText, { color: colors.text }]}>Action Required!</Text>
+          <Text style={[styles.summaryDetailText, { color: colors.subText }]}>{message}</Text>
         </View>
       </View>
     );
@@ -114,6 +116,7 @@ const SmartSummary = ({ present, total }: { present: number, total: number }) =>
 
 const AnimatedAttendanceCard = ({ item, index, todayStatus }: { item: RegisteredCourse, index: number, todayStatus?: string }) => {
   const navigation = useNavigation<any>();
+  const { colors, isDark } = useTheme();
   const { courseName, courseId, studentId, studentCourseCompDetails } = item;
   const details = studentCourseCompDetails?.[0];
 
@@ -177,7 +180,13 @@ const AnimatedAttendanceCard = ({ item, index, todayStatus }: { item: Registered
     }
 
     return (
-      <View style={[styles.todayBadge, { backgroundColor: badgeBg, borderColor: badgeColor + '40' }]}>
+      <View style={[
+        styles.todayBadge,
+        {
+          backgroundColor: isDark ? badgeColor + '20' : badgeBg,
+          borderColor: badgeColor + '40'
+        }
+      ]}>
         <Icon name={badgeIcon} size={14} color={badgeColor} />
         <Text style={[styles.todayBadgeText, { color: badgeColor }]}>{badgeText}</Text>
       </View>
@@ -186,28 +195,32 @@ const AnimatedAttendanceCard = ({ item, index, todayStatus }: { item: Registered
 
   return (
     <Animated.View style={animatedStyle}>
-      <TouchableOpacity onPress={handlePress} activeOpacity={0.9} style={styles.card}>
+      <TouchableOpacity
+        onPress={handlePress}
+        activeOpacity={0.9}
+        style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+      >
         <View style={styles.cardHeader}>
-          <Text style={styles.courseName} numberOfLines={2}>{courseName}</Text>
-          <View style={styles.percentageContainer}>
+          <Text style={[styles.courseName, { color: colors.text }]} numberOfLines={2}>{courseName}</Text>
+          <View style={[styles.percentageContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
             <Text style={[styles.percentageText, { color: progressColor }]}>{percentage.toFixed(1)}%</Text>
           </View>
         </View>
 
         <View style={styles.metaRow}>
           {/* ✅ FIX: Removed extra brace causing the syntax error */}
-          <Text style={styles.attendedText}>{present} of {total} Attended</Text>
+          <Text style={[styles.attendedText, { color: colors.subText }]}>{present} of {total} Attended</Text>
           {renderTodayBadge()}
         </View>
 
-        <View style={styles.progressBarBackground}>
+        <View style={[styles.progressBarBackground, { backgroundColor: isDark ? '#333' : '#ecf0f1' }]}>
           <View style={[styles.progressBar, { width: `${percentage}%`, backgroundColor: progressColor }]} />
         </View>
         <SmartSummary present={present} total={total} />
-        <View style={styles.footerSeparator} />
+        <View style={[styles.footerSeparator, { backgroundColor: colors.border }]} />
         <Pressable onPress={handlePress} style={({ pressed }) => [styles.cardFooterAction, pressed && styles.pressed]}>
-          <Text style={styles.viewDetailsText}>View Details</Text>
-          <Icon name="arrow-forward-circle" size={22} color="#2980b9" />
+          <Text style={[styles.viewDetailsText, { color: colors.primary }]}>View Details</Text>
+          <Icon name="arrow-forward-circle" size={22} color={colors.primary} />
         </Pressable>
       </TouchableOpacity>
     </Animated.View>
@@ -252,6 +265,7 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
   const [refreshing, setRefreshing] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
+  const { colors, isDark, toggleTheme } = useTheme();
 
   const [todayAttendanceMap, setTodayAttendanceMap] = useState<{ [key: number]: string }>({});
 
@@ -480,7 +494,7 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
 
   if (loading && !refreshing) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <SkeletonPlaceholderComponent />
       </SafeAreaView>
     );
@@ -488,11 +502,11 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
 
   if (error && !loading) {
     return (
-      <SafeAreaView style={styles.centerContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <Button title="Try Again" onPress={fetchAllData} color="#2980b9" />
+      <SafeAreaView style={[styles.centerContainer, { backgroundColor: colors.background }]}>
+        <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
+        <Button title="Try Again" onPress={fetchAllData} color={colors.primary} />
         <View style={{ marginTop: 10 }} />
-        <Button title="Logout" onPress={onLogout} color="#c0392b" />
+        <Button title="Logout" onPress={onLogout} color={colors.danger} />
       </SafeAreaView>
     );
   }
@@ -505,55 +519,75 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
             <TouchableOpacity onPress={() => setPhotoModalVisible(true)}>
               <Image
                 source={{ uri: profilePhoto }}
-                style={styles.profilePhoto}
+                style={[styles.profilePhoto, { borderColor: colors.headerBg, backgroundColor: isDark ? '#333' : '#e0e7ff' }]}
               />
             </TouchableOpacity>
           )}
           <View>
-            <Text style={styles.greeting}>{getGreeting()}</Text>
-            <Text style={styles.title}>{userData?.fullName?.split(' ')[0]}!</Text>
+            <Text style={[styles.greeting, { color: colors.subText }]}>{getGreeting()}</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{userData?.fullName?.split(' ')[0]}!</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={onLogout} style={styles.logoutButton}>
-          <Text style={styles.logoutButtonText}>Logout</Text>
+        <TouchableOpacity onPress={onLogout} style={[styles.logoutButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(236, 240, 241, 0.8)' }]}>
+          <Text style={[styles.logoutButtonText, { color: colors.subText }]}>Logout</Text>
+        </TouchableOpacity>
+
+        {/* 🌗 Theme Toggle Button */}
+        <TouchableOpacity
+          onPress={toggleTheme}
+          style={[styles.logoutButton, { marginLeft: 10, backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(236, 240, 241, 0.8)' }]}
+        >
+          <Icon name={isDark ? "sunny" : "moon"} size={20} color={isDark ? "#f1c40f" : "#34495e"} />
         </TouchableOpacity>
       </View>
 
       {/* LiveTracker removed */}
 
-      <View style={styles.detailCard}>
-        <View style={styles.detailRow}><Icon name="person-outline" size={20} color="#34495e" style={styles.iconStyle} /><Text style={styles.detailLabel}>Roll No.</Text><Text style={styles.detailValue}>{userData?.rollNumber?.trim()}</Text></View>
-        <View style={styles.detailRow}><Icon name="school-outline" size={20} color="#34495e" style={styles.iconStyle} /><Text style={styles.detailLabel}>Branch</Text><Text style={styles.detailValue}>{userData?.branchShortName}</Text></View>
-        <View style={[styles.detailRow, { borderBottomWidth: 0 }]}><Icon name="library-outline" size={20} color="#34495e" style={styles.iconStyle} /><Text style={styles.detailLabel}>Semester</Text><Text style={styles.detailValue}>{userData?.semesterName}</Text></View>
+      <View style={[styles.detailCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.detailRow, { borderBottomColor: colors.border }]}>
+          <Icon name="person-outline" size={20} color={colors.subText} style={styles.iconStyle} />
+          <Text style={[styles.detailLabel, { color: colors.subText }]}>Roll No.</Text>
+          <Text style={[styles.detailValue, { color: colors.text }]}>{userData?.rollNumber?.trim()}</Text>
+        </View>
+        <View style={[styles.detailRow, { borderBottomColor: colors.border }]}>
+          <Icon name="school-outline" size={20} color={colors.subText} style={styles.iconStyle} />
+          <Text style={[styles.detailLabel, { color: colors.subText }]}>Branch</Text>
+          <Text style={[styles.detailValue, { color: colors.text }]}>{userData?.branchShortName}</Text>
+        </View>
+        <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
+          <Icon name="library-outline" size={20} color={colors.subText} style={styles.iconStyle} />
+          <Text style={[styles.detailLabel, { color: colors.subText }]}>Semester</Text>
+          <Text style={[styles.detailValue, { color: colors.text }]}>{userData?.semesterName}</Text>
+        </View>
       </View>
-      <View style={styles.card}>
-        <Text style={styles.listHeader}>Overall Summary</Text>
+      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.listHeader, { color: colors.text }]}>Overall Summary</Text>
         <View style={styles.summaryContainer}>
           <CircularProgress
             fill={dashboardData?.presentPerc || 0}
             size={120}
             width={12}
-            tintColor={(dashboardData?.presentPerc || 0) >= 75 ? '#27ae60' : '#c0392b'}
-            backgroundColor="#ecf0f1"
+            tintColor={(dashboardData?.presentPerc || 0) >= 75 ? colors.success : colors.danger}
+            backgroundColor={isDark ? '#333' : '#ecf0f1'}
             rotation={0}
             lineCap="round"
           >
-            {(fill: number) => (<Text style={styles.progressText}>{fill.toFixed(1)}%</Text>)}
+            {(fill: number) => (<Text style={[styles.progressText, { color: colors.text }]}>{fill.toFixed(1)}%</Text>)}
           </CircularProgress>
           <View style={styles.summaryTextContainer}>
-            <Text style={styles.summaryTitle}>Total Attendance</Text>
-            <Text style={styles.summarySubtitle}>Your official attendance summary from the dashboard.</Text>
+            <Text style={[styles.summaryTitle, { color: colors.text }]}>Total Attendance</Text>
+            <Text style={[styles.summarySubtitle, { color: colors.subText }]}>Your official attendance summary from the dashboard.</Text>
           </View>
         </View>
       </View>
-      <Text style={styles.listHeader}>Subject-wise Breakdown</Text>
+      <Text style={[styles.listHeader, { color: colors.text }]}>Subject-wise Breakdown</Text>
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#e7f2f8" />
-      <LinearGradient colors={['#e7f2f8', '#f4f6f8', '#f4f6f8']} style={{ flex: 1 }}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.gradientWait[0]} />
+      <LinearGradient colors={colors.gradientWait} style={{ flex: 1 }}>
         <FlatList
           data={courses}
           renderItem={({ item, index }) => (
@@ -583,7 +617,7 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
           activeOpacity={1}
           onPress={() => setPhotoModalVisible(false)}
         >
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: isDark ? 'rgba(0,0,0,0.9)' : 'white' }]}>
             {profilePhoto && (
               <Image
                 source={{ uri: profilePhoto }}
