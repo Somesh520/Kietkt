@@ -1,4 +1,5 @@
-import notifee, { TriggerType, AndroidImportance, TimestampTrigger } from '@notifee/react-native';
+import notifee, { TriggerType, AndroidImportance, TimestampTrigger, AndroidNotificationSetting } from '@notifee/react-native';
+import { Platform, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getWeeklySchedule, getRegisteredCourses, TimetableEvent, RegisteredCourse } from '../api';
 
@@ -13,11 +14,37 @@ class AttendanceScheduler {
             importance: AndroidImportance.HIGH,
             sound: 'default',
         });
+
+        // 🔒 Android 12+ SCHEDULE_EXACT_ALARM runtime check
+        if (Platform.OS === 'android') {
+            const settings = await notifee.getNotificationSettings();
+            if (settings.android.alarm !== AndroidNotificationSetting.ENABLED) {
+                this.addLog('⚠️ Exact Alarm permission NOT granted! Opening settings...');
+                await notifee.openAlarmPermissionSettings();
+            } else {
+                this.addLog('✅ Exact Alarm permission granted.');
+            }
+        }
+    }
+
+    // Log Buffer for UI
+    private logs: string[] = [];
+
+    addLog(message: string) {
+        const timestamp = new Date().toLocaleTimeString();
+        const logEntry = `[${timestamp}] ${message}`;
+        console.log(logEntry);
+        this.logs.unshift(logEntry);
+        if (this.logs.length > 20) this.logs.pop(); // Keep last 20
+    }
+
+    getLogs() {
+        return this.logs;
     }
 
     // Main Scheduling Function
     async scheduleNotifications() {
-        console.log("🔄 Starting Attendance Scheduling...");
+        this.addLog("🔄 Starting Attendance Scheduling...");
         try {
             await this.init();
 
@@ -32,7 +59,8 @@ class AttendanceScheduler {
             }
 
             // 2. Clear Existing Notifications to avoid duplicates
-            await notifee.cancelAllNotifications();
+            // ✅ FIX: Only cancel TRIGGER notifications (not displayed foreground service)
+            await notifee.cancelTriggerNotifications();
 
             // 3. Group Classes by Date for Morning Summary
             const classesByDate: { [date: string]: { courses: string[], events: TimetableEvent[] } } = {};
@@ -53,7 +81,7 @@ class AttendanceScheduler {
 
                 // Only log if not already logged in this session to reduce noise
                 if (!processedCourses.has(courseId)) {
-                    console.log(`Checking: ${courseName} | Current: ${currentAttendance.toFixed(1)}% | Target: ${target}%`);
+                    this.addLog(`Checking: ${courseName} | Current: ${currentAttendance.toFixed(1)}% | Target: ${target}%`);
                     processedCourses.add(courseId);
                 }
 
@@ -113,21 +141,25 @@ class AttendanceScheduler {
                             tenMinBefore.getTime()
                         );
                     } else if (classDate > now) {
-                        // Fallback: Class hasn't started yet, but < 10 mins left (e.g. user opened app at 1:19 for 1:20 class)
-                        // Trigger IMMEDIATE notification
+                        // ✅ FIX: Use displayNotification for IMMEDIATE delivery
+                        // AlarmManager ignores timestamps < 5s in the future
                         const minutesLeft = Math.ceil((classDate.getTime() - now.getTime()) / 60000);
 
-                        // Only notify if we haven't already passed the class time
-                        await this.createTriggerNotification(
-                            `Hurry Up! ${courseName}`,
-                            `Class starts in ${minutesLeft} mins! ${bodyText}`,
-                            now.getTime() + 1000 // 1 sec delay to ensure it triggers
-                        );
+                        await notifee.displayNotification({
+                            title: `Hurry Up! ${courseName}`,
+                            body: `Class starts in ${minutesLeft} mins! ${bodyText}`,
+                            android: {
+                                channelId: 'attendance_alert',
+                                importance: AndroidImportance.HIGH,
+                                pressAction: { id: 'default' },
+                            },
+                        });
+                        this.addLog(`🚨 IMMEDIATE: "Hurry Up! ${courseName}" (${minutesLeft} mins left)`);
                     }
                 }
             }
 
-            console.log("✅ Attendance Notifications Scheduled Successfully");
+            this.addLog("✅ Attendance Notifications Scheduled Successfully");
 
         } catch (error) {
             console.error("❌ Error scheduling attendance notifications:", error);
@@ -166,6 +198,9 @@ class AttendanceScheduler {
         const trigger: TimestampTrigger = {
             type: TriggerType.TIMESTAMP,
             timestamp: timestamp,
+            alarmManager: {
+                allowWhileIdle: true,
+            },
         };
 
         await notifee.createTriggerNotification(
@@ -181,7 +216,7 @@ class AttendanceScheduler {
             },
             trigger,
         );
-        console.log(`⏰ Scheduled: "${title}" at ${new Date(timestamp).toLocaleString()}`);
+        this.addLog(`⏰ Scheduled: "${title}" at ${new Date(timestamp).toLocaleString()}`);
     }
 
     parseDate(dateString: string): Date {

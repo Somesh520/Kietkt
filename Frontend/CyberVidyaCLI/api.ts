@@ -328,12 +328,14 @@ export const getAttendanceAndDetails = async (): Promise<UserDetails> => {
 };
 
 // 📸 Get Student Profile Info (including profile photo)
-export const getStudentProfileInfo = async (): Promise<{
+export interface StudentProfile {
     fullName: string;
     registrationNumber: string;
     profilePhoto?: string;
     [key: string]: any;
-}> => {
+}
+
+export const getStudentProfileInfo = async (): Promise<StudentProfile> => {
     try {
         const response = await apiClient.get('/info/student/fetch');
         if (response.data?.data) {

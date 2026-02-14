@@ -8,6 +8,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import Icon from 'react-native-vector-icons/Ionicons';
 import axios from 'axios';
+import BackgroundFetch from 'react-native-background-fetch';
 
 // 🔥 ADVANCED MODULAR ANALYTICS IMPORT
 import {
@@ -27,6 +28,7 @@ import TimetableScreen from './Screen/Timetable';
 import CourseDetailsScreen from './Screen/CourseDetailsScreen';
 import ExamScheduleScreen from './Screen/Exams';
 import HallTicketScreen from './Screen/HallTicketScreen';
+import NotificationSettings from './Screen/NotificationSettings';
 import SplashScreen from './Screen/SplashScreen';
 import { logout, onAuthError } from './api';
 import NotificationService from './services/NotificationService';
@@ -110,7 +112,7 @@ function MainAppTabs({ onLogout }: AuthProps) {
       <Tab.Screen name="Home" children={() => <HomeScreen onLogout={onLogout} />} />
       <Tab.Screen name="Timetable" component={TimetableScreen} />
       <Tab.Screen name="Exams" component={ExamManagerScreen} />
-      <Tab.Screen name="About us" component={ProfileScreen} />
+      <Tab.Screen name="About us" children={() => <ProfileScreen onLogout={onLogout} />} />
     </Tab.Navigator>
   );
 }
@@ -138,6 +140,11 @@ function AppStack({ onLogout }: AuthProps) {
         name="CourseDetails"
         component={CourseDetailsScreen}
         options={{ title: 'Lecture Details' }}
+      />
+      <Stack.Screen
+        name="NotificationSettings"
+        component={NotificationSettings}
+        options={{ title: 'Notification Center' }}
       />
     </Stack.Navigator>
   );
@@ -230,6 +237,9 @@ function App(): React.JSX.Element {
         await NotificationService.getFCMToken();
         // 🗓️ Schedule Initial
         await AttendanceScheduler.scheduleNotifications();
+
+        // 🛡️ Start Foreground Service for Reliability
+        await NotificationService.startForegroundService();
       }
     };
 
@@ -242,6 +252,33 @@ function App(): React.JSX.Element {
         unsubscribe();
       }
     };
+  }, []);
+
+  // 4. Background Fetch Implementation (Periodic Sync)
+  useEffect(() => {
+    const initBackgroundFetch = async () => {
+      const status = await BackgroundFetch.configure({
+        minimumFetchInterval: 60, // Fetch every 60 minutes
+        stopOnTerminate: false,
+        startOnBoot: true,
+        enableHeadless: true,
+        requiredNetworkType: BackgroundFetch.NETWORK_TYPE_ANY,
+        forceAlarmManager: true, // ⚠️ Reliable Trigger on older devices/OEMs
+      }, async (taskId) => {
+        console.log('[BackgroundFetch] taskId: ', taskId);
+
+        // Synch Logic
+        await AttendanceScheduler.scheduleNotifications();
+
+        // Finish
+        BackgroundFetch.finish(taskId);
+      }, (error) => {
+        console.log('[BackgroundFetch] failed to start');
+      });
+      console.log('[BackgroundFetch] configure status: ', status);
+    };
+
+    initBackgroundFetch();
   }, []);
 
   // 2. 🚀 UPDATE CHECK (Pop-up Alert Logic)
@@ -358,7 +395,6 @@ function App(): React.JSX.Element {
               const currentRouteName = navigationRef.getCurrentRoute()?.name ?? 'Unknown';
 
               if (previousRouteName !== currentRouteName) {
-                // ⚠️ Fix: logScreenView is deprecated. Use logEvent('screen_view') instead.
                 await logEvent(getAnalytics(), 'screen_view', {
                   screen_name: currentRouteName,
                   screen_class: currentRouteName,
@@ -381,6 +417,7 @@ function App(): React.JSX.Element {
           </NavigationContainer>
         )}
 
+        {/* Splash overlays ABOVE everything — Login WebView loads underneath */}
         {showSplash && (
           <View style={styles.splashContainer}>
             <SplashScreen onFinish={handleSplashFinish} />

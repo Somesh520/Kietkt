@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -13,11 +14,16 @@ import {
   Image,
   ViewStyle,
   StyleProp,
+  TouchableOpacity,
 } from 'react-native';
 import axios from 'axios';
+import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../ThemeContext';
+import Icon from 'react-native-vector-icons/Ionicons';
+import { getStudentProfileInfo, StudentProfile } from '../api';
+import notifee from '@notifee/react-native';
 
-// --- Types & Interfaces ---
+// ... Types & Interfaces ...
 interface TeamMember {
   name: string;
   role: string;
@@ -46,12 +52,13 @@ interface StatusConfigItem {
   text: string;
 }
 
-// --- Constants ---
+// ... Constants ...
 const CURRENT_APP_VERSION = "v1.1.5";
 const UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Somesh520/Kietkt/main/update.json";
 
-// --- Data ---
+// ... Data ...
 const teamMembers: TeamMember[] = [
+  // ... (same as before) ...
   {
     name: 'Somesh Tiwari',
     role: 'Lead Developer',
@@ -78,7 +85,7 @@ const teamMembers: TeamMember[] = [
   },
 ];
 
-// --- Components ---
+// ... Components ...
 const SimpleIcon = ({ name, size = 20, color = '#333' }: SimpleIconProps) => {
   let iconChar = '•';
   switch (name) {
@@ -116,11 +123,13 @@ const ScaleButton = ({ onPress, style, children }: ScaleButtonProps) => {
   );
 };
 
-export default function ProfileScreen() {
+const ProfileScreen = ({ onLogout }: { onLogout: () => void }) => {
+  const { colors, isDark } = useTheme();
+  const navigation = useNavigation<any>();
+  const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('checking');
   const [latestVersion, setLatestVersion] = useState<string>(CURRENT_APP_VERSION);
   const [downloadLink, setDownloadLink] = useState<string>('');
-  const { colors, isDark } = useTheme();
 
   const headerAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -132,7 +141,7 @@ export default function ProfileScreen() {
   const checkUpdates = async () => {
     try {
       setUpdateStatus('checking');
-      const response = await axios.get(`${UPDATE_MANIFEST_URL}?t=${new Date().getTime()}`);
+      const response = await axios.get(`${UPDATE_MANIFEST_URL}?t = ${new Date().getTime()} `);
       const manifest = response.data;
       const latest = manifest.version || CURRENT_APP_VERSION;
       setLatestVersion(latest);
@@ -166,6 +175,7 @@ export default function ProfileScreen() {
   };
 
   useEffect(() => {
+    getStudentProfileInfo().then(setProfile).catch(err => console.log("Profile fetch failed", err));
     checkUpdates();
     Animated.parallel([
       Animated.timing(opacityAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
@@ -179,7 +189,7 @@ export default function ProfileScreen() {
   const handleUpdatePress = () => {
     if (updateStatus === 'available' && downloadLink) Linking.openURL(downloadLink);
     else if (updateStatus === 'error') checkUpdates();
-    else if (updateStatus === 'latest') Alert.alert("Up to Date", `Version ${CURRENT_APP_VERSION}`);
+    else if (updateStatus === 'latest') Alert.alert("Up to Date", `Version ${CURRENT_APP_VERSION} `);
   };
 
   // ... Render functions ...
@@ -201,6 +211,28 @@ export default function ProfileScreen() {
             <Text style={[styles.badgeText, { color: colors.subText }]}>{CURRENT_APP_VERSION}</Text>
           </View>
         </View>
+
+
+        <TouchableOpacity
+          style={[styles.menuItem, { borderBottomColor: colors.border }]}
+          onPress={() => {
+            Alert.alert(
+              "Hide Status Notification",
+              "This will open system settings. Turn OFF 'Background Sync' notification to hide the status bar icon while keeping attendance sync active.",
+              [
+                { text: "Cancel", style: "cancel" },
+                { text: "Open Settings", onPress: () => notifee.openNotificationSettings('fg_silent_v2') }
+              ]
+            );
+          }}
+        >
+          <Icon name="eye-off-outline" size={24} color={colors.primary} />
+          <Text style={[styles.menuText, { color: colors.text }]}>Hide Status App</Text>
+          <Icon name="chevron-forward" size={20} color={colors.subText} />
+        </TouchableOpacity>
+
+
+
         <View style={[styles.statusRow, { backgroundColor: config.bg }]}>
           {updateStatus === 'checking' ? (
             <ActivityIndicator size="small" color={config.color} />
@@ -303,6 +335,8 @@ export default function ProfileScreen() {
   );
 }
 
+export default ProfileScreen;
+
 const styles = StyleSheet.create({
   mainContainer: { flex: 1, backgroundColor: '#f3f4f6' },
   headerContainer: {
@@ -310,10 +344,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#4f46e5',
     overflow: 'hidden',
     justifyContent: 'center',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderTopWidth: 1,
+    borderColor: '#eee',
+    marginBottom: 20,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
     paddingHorizontal: 20,
-    borderBottomRightRadius: 30,
-    borderBottomLeftRadius: 30,
-    elevation: 10,
+    borderBottomWidth: 1,
+  },
+  menuText: {
+    flex: 1,
+    fontSize: 16,
+    marginLeft: 15,
   },
   blob: { position: 'absolute', borderRadius: 999, opacity: 0.5 },
   headerContent: { marginTop: 20, zIndex: 10 },

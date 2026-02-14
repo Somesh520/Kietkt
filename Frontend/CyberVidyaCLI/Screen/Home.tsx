@@ -14,6 +14,7 @@ import {
   Image,
   Modal,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -267,6 +268,17 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
   const { colors, isDark, toggleTheme } = useTheme();
 
+  const handleLogout = () => {
+    Alert.alert(
+      "Logout",
+      "Are you sure you want to logout?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Logout", style: 'destructive', onPress: onLogout }
+      ]
+    );
+  };
+
   const [todayAttendanceMap, setTodayAttendanceMap] = useState<{ [key: number]: string }>({});
 
   // Fetch profile photo
@@ -506,7 +518,7 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
         <Text style={[styles.errorText, { color: colors.danger }]}>{error}</Text>
         <Button title="Try Again" onPress={fetchAllData} color={colors.primary} />
         <View style={{ marginTop: 10 }} />
-        <Button title="Logout" onPress={onLogout} color={colors.danger} />
+        <Button title="Logout" onPress={handleLogout} color={colors.danger} />
       </SafeAreaView>
     );
   }
@@ -528,7 +540,7 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
             <Text style={[styles.title, { color: colors.text }]}>{userData?.fullName?.split(' ')[0]}!</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={onLogout} style={[styles.logoutButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(236, 240, 241, 0.8)' }]}>
+        <TouchableOpacity onPress={handleLogout} style={[styles.logoutButton, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(236, 240, 241, 0.8)' }]}>
           <Text style={[styles.logoutButtonText, { color: colors.subText }]}>Logout</Text>
         </TouchableOpacity>
 
@@ -581,7 +593,7 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
         </View>
       </View>
       <Text style={[styles.listHeader, { color: colors.text }]}>Subject-wise Breakdown</Text>
-    </View>
+    </View >
   );
 
   return (

@@ -1,5 +1,6 @@
 import messaging from '@react-native-firebase/messaging';
-import { PermissionsAndroid, Platform, Alert } from 'react-native';
+import notifee, { AndroidImportance, AndroidVisibility } from '@notifee/react-native';
+import { PermissionsAndroid, Platform, Alert, Linking } from 'react-native';
 
 class NotificationService {
 
@@ -29,20 +30,38 @@ class NotificationService {
     // 1. Request User Permission
     async requestUserPermission() {
         console.log('🔵 Checking Notification Permission...');
-        if (Platform.OS === 'android' && Platform.Version >= 33) {
-            const granted = await PermissionsAndroid.request(
-                PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
-            );
-            console.log('🔵 Android 13+ Permission Result:', granted);
-            if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-                console.log('✅ Android 13+ Notification Permission Granted');
-                return true;
+
+        if (Platform.OS === 'android') {
+            // Android 13+ (API Level 33+) logic
+            if (Platform.Version >= 33) {
+                const granted = await PermissionsAndroid.request(
+                    PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+                );
+                console.log('🔵 Android 13+ Permission Result:', granted);
+
+                if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+                    console.log('✅ Android 13+ Notification Permission Granted');
+                    return true;
+                } else {
+                    console.log('❌ Android 13+ Notification Permission Denied');
+                    // Alert user to enable manually if they denied it
+                    Alert.alert(
+                        'Notifications Permission',
+                        'To receive attendance alerts, please enable notifications in settings.',
+                        [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Open Settings', onPress: () => Linking.openSettings() } // Import Linking needs to be added
+                        ]
+                    );
+                    return false;
+                }
             } else {
-                console.log('❌ Android 13+ Notification Permission Denied');
-                return false;
+                // Android < 13: Permission is granted by default at install time
+                console.log('✅ Android < 13: Permission auto-granted');
+                return true;
             }
         } else {
-            // For iOS and older Android versions
+            // iOS Logic
             console.log('🔵 Requesting permission via messaging()...');
             const authStatus = await messaging().requestPermission();
             const enabled =
@@ -106,6 +125,41 @@ class NotificationService {
             });
 
         return unsubscribe;
+    }
+    async startForegroundService() {
+        if (Platform.OS !== 'android') return;
+
+        console.log('🚀 Starting Foreground Service...');
+
+        // Create a channel for the foreground service
+        await notifee.createChannel({
+            id: 'fg_silent_v2',
+            name: 'Background Sync',
+            importance: AndroidImportance.MIN,
+            visibility: AndroidVisibility.SECRET,
+        });
+
+        // Display the notification which promotes the app to a Foreground Service
+        await notifee.displayNotification({
+            id: 'foreground_notification',
+            title: 'Attendance Monitor Active',
+            body: 'Keeping your attendance data in sync.',
+            android: {
+                channelId: 'fg_silent_v2',
+                asForegroundService: true,
+                ongoing: true,
+                // 1 corresponds to FOREGROUND_SERVICE_TYPE_DATA_SYNC in Android 14+
+                foregroundServiceTypes: [1],
+                pressAction: {
+                    id: 'default',
+                },
+            },
+        });
+    }
+
+    async stopForegroundService() {
+        if (Platform.OS !== 'android') return;
+        await notifee.stopForegroundService();
     }
 }
 

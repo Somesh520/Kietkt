@@ -205,10 +205,7 @@ const LoginPage = ({ onLoginSuccess }: LoginProps) => {
           showsVerticalScrollIndicator={false}
 
           onLoadProgress={({ nativeEvent }) => {
-            // Keep loading until we actually get the token or user interacts
-            if (nativeEvent.progress > 0.8) {
-              // Optional: Can hide if taking too long, but better to wait for token
-            }
+            if (nativeEvent.progress > 0.85) setIsLoading(false);
           }}
         />
 

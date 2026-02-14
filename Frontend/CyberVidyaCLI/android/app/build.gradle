@@ -76,7 +76,7 @@ android {
         applicationId "com.cybervidyacli"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 5
+        versionCode 13
         versionName "1.1.5"
         // ✅ The old ndk block has been removed from here to allow splitting.
     }
