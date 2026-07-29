@@ -4,12 +4,12 @@ Welcome to the **BunkBook** repository! BunkBook is an essential companion app d
 
 ## 🌟 Achievement Unlocked
 
-We are incredibly proud to share that BunkBook has achieved a **4.9 rating** and is loved by our amazing users! Thank you for the overwhelming support.
+We are incredibly proud to share that BunkBook has crossed **4.9k active users**! Thank you for the overwhelming support.
 
 Here is the proof of our milestone:
 
 <div align="center">
-  <img src="./Screenshot%202026-07-29%20at%2012.26.12%E2%80%AFPM.png" alt="4.9 Rating Proof" width="400"/>
+  <img src="./Screenshot 2026-07-29 at 12.26.12 PM.png" alt="4.9k Users Proof" width="400"/>
 </div>
 
 ## 🚀 About the Project
