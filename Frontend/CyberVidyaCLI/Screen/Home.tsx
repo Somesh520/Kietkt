@@ -73,15 +73,20 @@ const getAttendanceInfo = (present: number, total: number) => {
 
 const SmartSummary = ({ present, total }: { present: number, total: number }) => {
   const { status, message } = getAttendanceInfo(present, total);
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, isBrutalist } = useTheme();
 
   if (total === 0) {
     return (
-      <View style={[styles.summaryBox, { backgroundColor: isDark ? 'rgba(52, 139, 159, 0.2)' : 'rgba(232, 245, 233, 0.8)' }]}>
-        <Icon name="hourglass-outline" size={30} color={colors.primary} />
+      <View style={[
+        styles.summaryBox,
+        { backgroundColor: isDark ? 'rgba(52, 139, 159, 0.2)' : 'rgba(232, 245, 233, 0.8)' },
+        isBrutalist && styles.brutalistSummaryBox,
+        isBrutalist && { backgroundColor: colors.primary, borderColor: colors.border, shadowColor: colors.border }
+      ]}>
+        <Icon name="hourglass-outline" size={30} color={isBrutalist ? '#000' : colors.primary} />
         <View style={styles.summaryContent}>
-          <Text style={[styles.summaryStatusText, { color: colors.text }]}>Classes Haven't Started</Text>
-          <Text style={[styles.summaryDetailText, { color: colors.subText }]}>{message}</Text>
+          <Text style={[styles.summaryStatusText, { color: colors.text }, isBrutalist && styles.brutalistText, isBrutalist && { color: '#000' }]}>Classes Haven't Started</Text>
+          <Text style={[styles.summaryDetailText, { color: colors.subText }, isBrutalist && styles.brutalistSubText, isBrutalist && { color: '#000' }]}>{message}</Text>
         </View>
       </View>
     );
@@ -90,25 +95,36 @@ const SmartSummary = ({ present, total }: { present: number, total: number }) =>
   if (status === 'safe') {
     const canMiss = Math.floor(present / 0.75 - total);
     return (
-      <View style={[styles.summaryBox, { backgroundColor: isDark ? 'rgba(39, 174, 96, 0.2)' : 'rgba(232, 245, 233, 0.8)' }]}>
-        <Icon name="shield-checkmark" size={40} color={colors.success} />
+      <View style={[
+        styles.summaryBox,
+        { backgroundColor: isDark ? 'rgba(39, 174, 96, 0.2)' : 'rgba(232, 245, 233, 0.8)' },
+        isBrutalist && styles.brutalistSummaryBox,
+        isBrutalist && { backgroundColor: colors.success, borderColor: colors.border, shadowColor: colors.border }
+      ]}>
+        <Icon name="shield-checkmark" size={40} color={isBrutalist ? '#000' : colors.success} />
         <View style={styles.summaryContent}>
-          <Text style={[styles.summaryStatusText, { color: colors.text }]}>Attendance is Safe</Text>
+          <Text style={[styles.summaryStatusText, { color: colors.text }, isBrutalist && styles.brutalistText, isBrutalist && { color: '#000' }]}>Attendance is Safe</Text>
           {canMiss > 0 ? (
-            <Text style={[styles.canMissText, { color: colors.success }]}>You can miss {canMiss} more classes.</Text>
+            <Text style={[styles.canMissText, { color: colors.success }, isBrutalist && styles.brutalistText, isBrutalist && { color: '#000' }]}>You can miss {canMiss} more classes.</Text>
           ) : (
-            <Text style={[styles.summaryDetailText, { color: colors.subText }]}>Don't miss any classes to stay above 75%.</Text>
+            <Text style={[styles.summaryDetailText, { color: colors.subText }, isBrutalist && styles.brutalistSubText, isBrutalist && { color: '#000' }]}>Don't miss any classes to stay above 75%.</Text>
           )}
         </View>
       </View>
     );
   } else {
     return (
-      <View style={[styles.summaryBox, styles.summaryBoxWarning, { backgroundColor: isDark ? 'rgba(243, 156, 18, 0.2)' : 'rgba(255, 243, 224, 0.8)' }]}>
-        <Icon name="warning" size={40} color={status === 'danger' ? colors.danger : colors.warning} />
+      <View style={[
+        styles.summaryBox,
+        styles.summaryBoxWarning,
+        { backgroundColor: isDark ? 'rgba(243, 156, 18, 0.2)' : 'rgba(255, 243, 224, 0.8)' },
+        isBrutalist && styles.brutalistSummaryBox,
+        isBrutalist && { backgroundColor: colors.warning, borderColor: colors.border, shadowColor: colors.border }
+      ]}>
+        <Icon name="warning" size={40} color={isBrutalist ? '#000' : (status === 'danger' ? colors.danger : colors.warning)} />
         <View style={styles.summaryContent}>
-          <Text style={[styles.summaryStatusText, { color: colors.text }]}>Action Required!</Text>
-          <Text style={[styles.summaryDetailText, { color: colors.subText }]}>{message}</Text>
+          <Text style={[styles.summaryStatusText, { color: colors.text }, isBrutalist && styles.brutalistText, isBrutalist && { color: '#000' }]}>Action Required!</Text>
+          <Text style={[styles.summaryDetailText, { color: colors.subText }, isBrutalist && styles.brutalistSubText, isBrutalist && { color: '#000' }]}>{message}</Text>
         </View>
       </View>
     );
@@ -117,7 +133,7 @@ const SmartSummary = ({ present, total }: { present: number, total: number }) =>
 
 const AnimatedAttendanceCard = ({ item, index, todayStatus }: { item: RegisteredCourse, index: number, todayStatus?: string }) => {
   const navigation = useNavigation<any>();
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, isBrutalist } = useTheme();
   const { courseName, courseId, studentId, studentCourseCompDetails } = item;
   const details = studentCourseCompDetails?.[0];
 
@@ -199,29 +215,49 @@ const AnimatedAttendanceCard = ({ item, index, todayStatus }: { item: Registered
       <TouchableOpacity
         onPress={handlePress}
         activeOpacity={0.9}
-        style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+        style={[
+          styles.card,
+          { backgroundColor: colors.card, borderColor: colors.border },
+          isBrutalist && styles.brutalistCard,
+          isBrutalist && { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.border }
+        ]}
       >
         <View style={styles.cardHeader}>
-          <Text style={[styles.courseName, { color: colors.text }]} numberOfLines={2}>{courseName}</Text>
-          <View style={[styles.percentageContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]}>
-            <Text style={[styles.percentageText, { color: progressColor }]}>{percentage.toFixed(1)}%</Text>
+          <Text style={[styles.courseName, { color: colors.text }, isBrutalist && styles.brutalistText]} numberOfLines={2}>{courseName}</Text>
+          <View style={[
+            styles.percentageContainer,
+            { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' },
+            isBrutalist && styles.brutalistBadge,
+            isBrutalist && { borderColor: colors.border, backgroundColor: colors.card }
+          ]}>
+            <Text style={[styles.percentageText, { color: isBrutalist ? colors.text : progressColor }, isBrutalist && styles.brutalistText]}>{percentage.toFixed(1)}%</Text>
           </View>
         </View>
 
         <View style={styles.metaRow}>
           {/* ✅ FIX: Removed extra brace causing the syntax error */}
-          <Text style={[styles.attendedText, { color: colors.subText }]}>{present} of {total} Attended</Text>
+          <Text style={[styles.attendedText, { color: colors.subText }, isBrutalist && styles.brutalistSubText]}>{present} of {total} Attended</Text>
           {renderTodayBadge()}
         </View>
 
-        <View style={[styles.progressBarBackground, { backgroundColor: isDark ? '#333' : '#ecf0f1' }]}>
-          <View style={[styles.progressBar, { width: `${percentage}%`, backgroundColor: progressColor }]} />
+        <View style={[
+          styles.progressBarBackground,
+          { backgroundColor: isDark ? '#333' : '#ecf0f1' },
+          isBrutalist && styles.brutalistProgressBarBackground,
+          isBrutalist && { borderColor: colors.border, backgroundColor: colors.card }
+        ]}>
+          <View style={[styles.progressBar, { width: `${percentage}%`, backgroundColor: progressColor }, isBrutalist && styles.brutalistProgressBar]} />
         </View>
         <SmartSummary present={present} total={total} />
-        <View style={[styles.footerSeparator, { backgroundColor: colors.border }]} />
+        <View style={[
+          styles.footerSeparator,
+          { backgroundColor: colors.border },
+          isBrutalist && styles.brutalistDivider,
+          isBrutalist && { backgroundColor: colors.border }
+        ]} />
         <Pressable onPress={handlePress} style={({ pressed }) => [styles.cardFooterAction, pressed && styles.pressed]}>
-          <Text style={[styles.viewDetailsText, { color: colors.primary }]}>View Details</Text>
-          <Icon name="arrow-forward-circle" size={22} color={colors.primary} />
+          <Text style={[styles.viewDetailsText, { color: colors.primary }, isBrutalist && styles.brutalistText]}>View Details</Text>
+          <Icon name="arrow-forward-circle" size={22} color={isBrutalist ? colors.text : colors.primary} />
         </Pressable>
       </TouchableOpacity>
     </Animated.View>
@@ -266,7 +302,8 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
   const [refreshing, setRefreshing] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
-  const { colors, isDark, toggleTheme } = useTheme();
+  const { colors, isDark, toggleTheme, isBrutalist, typography, spacing } = useTheme();
+  const navigation = useNavigation<any>();
 
   const handleLogout = () => {
     Alert.alert(
@@ -572,6 +609,29 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
           <Text style={[styles.detailValue, { color: colors.text }]}>{userData?.semesterName}</Text>
         </View>
       </View>
+
+      <TouchableOpacity
+        onPress={() => navigation.navigate('TripPlanner')}
+        style={[
+          styles.simulatorCard,
+          { 
+            backgroundColor: isDark ? '#1E1B4B' : '#EEF2FF',
+            borderColor: isDark ? '#312E81' : '#C7D2FE'
+          },
+          isBrutalist ? styles.brutalistCard : undefined,
+          isBrutalist ? { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.border } : undefined
+        ]}
+      >
+        <View style={styles.simulatorContent}>
+          <Icon name="airplane-outline" size={24} color={isBrutalist ? colors.text : colors.primary} style={{ marginRight: 12 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.simulatorTitle, { color: colors.text }, isBrutalist ? styles.brutalistText : undefined]}>Trip Simulator</Text>
+            <Text style={[styles.simulatorSubtitle, { color: colors.subText }, isBrutalist ? styles.brutalistSubText : undefined]}>Simulate attendance drops for future bunks</Text>
+          </View>
+          <Icon name="chevron-forward" size={18} color={isBrutalist ? colors.text : colors.primary} />
+        </View>
+      </TouchableOpacity>
+
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[styles.listHeader, { color: colors.text }]}>Overall Summary</Text>
         <View style={styles.summaryContainer}>
@@ -597,9 +657,14 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
   );
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.gradientWait[0]} />
-      <LinearGradient colors={colors.gradientWait} style={{ flex: 1 }}>
+    <SafeAreaView style={[
+      styles.safeArea,
+      { backgroundColor: colors.background },
+      isBrutalist && styles.brutalistMain,
+      isBrutalist && { backgroundColor: colors.background }
+    ]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isBrutalist ? colors.background : colors.gradientWait[0]} />
+      <LinearGradient colors={isBrutalist ? [colors.background, colors.background] : colors.gradientWait} style={{ flex: 1 }}>
         <FlatList
           data={courses}
           renderItem={({ item, index }) => (
@@ -666,19 +731,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e7ff'
   },
   greeting: { fontSize: 20, color: '#7f8c8d' },
-  title: { fontSize: 30, fontWeight: 'bold', color: '#2c3e50' },
-  logoutButton: { backgroundColor: 'rgba(236, 240, 241, 0.8)', paddingHorizontal: 16, paddingVertical: 9, borderRadius: 20 },
-  logoutButtonText: { color: '#34495e', fontWeight: '600', fontSize: 14 },
-  listHeader: { fontSize: 22, fontWeight: 'bold', color: '#2c3e50', marginBottom: 16 },
-  card: { backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 20, marginBottom: 16, padding: 20, elevation: 4, shadowColor: '#95a5a6', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.15, shadowRadius: 10, borderWidth: 1, borderColor: '#fff' },
+  title: { fontSize: 32, fontWeight: '700', color: '#2c3e50', letterSpacing: -0.5 },
+  logoutButton: { backgroundColor: 'rgba(255, 255, 255, 0.9)', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
+  logoutButtonText: { color: '#34495e', fontWeight: '700', fontSize: 14 },
+  listHeader: { fontSize: 24, fontWeight: '700', color: '#2c3e50', marginBottom: 16, letterSpacing: -0.5 },
+  card: { backgroundColor: 'rgba(255, 255, 255, 0.7)', borderRadius: 24, marginBottom: 20, padding: 20, elevation: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.08, shadowRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.8)' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  courseName: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50', flex: 1, marginRight: 10, lineHeight: 24 },
-  percentageContainer: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.05)' },
-  percentageText: { fontSize: 20, fontWeight: 'bold' },
-  attendedText: { fontSize: 15, color: '#7f8c8d', marginTop: 0 },
-  progressBarBackground: { height: 8, backgroundColor: '#ecf0f1', borderRadius: 4, overflow: 'hidden' },
-  progressBar: { height: '100%', borderRadius: 4 },
-  summaryBox: { flexDirection: 'row', marginTop: 15, backgroundColor: 'rgba(232, 245, 233, 0.8)', borderRadius: 12, padding: 15, alignItems: 'center' },
+  courseName: { fontSize: 20, fontWeight: '700', color: '#2c3e50', flex: 1, marginRight: 10, lineHeight: 26, letterSpacing: -0.3 },
+  percentageContainer: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.05)' },
+  percentageText: { fontSize: 20, fontWeight: '800' },
+  attendedText: { fontSize: 15, color: '#7f8c8d', marginTop: 0, fontWeight: '500' },
+  progressBarBackground: { height: 10, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 5, overflow: 'hidden' },
+  progressBar: { height: '100%', borderRadius: 5 },
+  summaryBox: { flexDirection: 'row', marginTop: 15, backgroundColor: 'rgba(232, 245, 233, 0.6)', borderRadius: 16, padding: 15, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' },
   summaryBoxWarning: { backgroundColor: 'rgba(255, 243, 224, 0.8)' },
   summaryContent: { flex: 1, marginLeft: 15 },
   summaryStatusText: { fontSize: 16, fontWeight: 'bold', color: '#333' },
@@ -727,6 +792,53 @@ const styles = StyleSheet.create({
     right: 20,
     zIndex: 10
   },
+
+  // --- NEO-BRUTALISM OVERRIDES ---
+  brutalistMain: {}, 
+  brutalistText: { fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' },
+  brutalistSubText: { fontWeight: '900', textTransform: 'uppercase' },
+  brutalistCard: { 
+    borderRadius: 0, 
+    borderWidth: 4, 
+    shadowOffset: { width: 8, height: 8 }, 
+    shadowOpacity: 1, 
+    shadowRadius: 0,
+    elevation: 0,
+    marginHorizontal: 0,
+    marginBottom: 24,
+  },
+  brutalistSummaryBox: {
+    borderRadius: 0,
+    borderWidth: 4,
+    shadowOffset: { width: 6, height: 6 }, 
+    shadowOpacity: 1, 
+    shadowRadius: 0,
+  },
+  brutalistSummaryBoxWarning: {},
+  brutalistBadge: { borderRadius: 0, borderWidth: 2 },
+  brutalistDivider: { height: 3, marginLeft: 0 },
+  brutalistProgressBarBackground: {
+    borderRadius: 0,
+    borderWidth: 2,
+    height: 12
+  },
+  brutalistProgressBar: {
+    borderRadius: 0,
+  },
+  simulatorCard: {
+    borderRadius: 20,
+    marginBottom: 20,
+    padding: 16,
+    borderWidth: 1,
+    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowColor: '#000',
+  },
+  simulatorContent: { flexDirection: 'row', alignItems: 'center' },
+  simulatorTitle: { fontSize: 18, fontWeight: '700', marginBottom: 2 },
+  simulatorSubtitle: { fontSize: 13, lineHeight: 18 },
 });
 
 export default HomeScreen;

@@ -28,7 +28,7 @@ if (Platform.OS === 'android') {
 
 // --- Skeleton Component ---
 const SkeletonCard = () => {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, isBrutalist } = useTheme();
   const opacity = useRef(new Animated.Value(0.3)).current;
   useEffect(() => {
     Animated.loop(
@@ -40,7 +40,7 @@ const SkeletonCard = () => {
   }, [opacity]);
 
   return (
-    <View style={[styles.skeletonCard, { backgroundColor: isDark ? '#1F2937' : '#FFFFFF', borderColor: colors.border }]}>
+    <View style={[styles.skeletonCard, { backgroundColor: isDark ? '#1F2937' : '#FFFFFF', borderColor: colors.border }, isBrutalist && styles.brutalistCard]}>
       <Animated.View style={[styles.skeleton, { opacity, height: 18, width: '60%', marginBottom: 12, backgroundColor: isDark ? '#374151' : '#F3F4F6' }]} />
       <Animated.View style={[styles.skeleton, { opacity, height: 14, width: '40%', marginBottom: 0, backgroundColor: isDark ? '#374151' : '#F3F4F6' }]} />
     </View>
@@ -74,7 +74,7 @@ const EmptyExamState = ({ message = "No Exams Scheduled!", subMessage = "Relax a
 
 // --- Minimalist Result Item ---
 const SemesterResultCard = ({ semester }: { semester: ExamScoreSemester }) => {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, isBrutalist } = useTheme();
   const [expanded, setExpanded] = useState(false);
 
   const toggleExpand = () => {
@@ -83,7 +83,12 @@ const SemesterResultCard = ({ semester }: { semester: ExamScoreSemester }) => {
   };
 
   return (
-    <View style={[styles.minimalCard, { backgroundColor: isDark ? '#1F2937' : '#FFFFFF', borderColor: isDark ? '#374151' : '#E5E7EB' }]}>
+    <View style={[
+      styles.minimalCard,
+      { backgroundColor: isDark ? '#1F2937' : '#FFFFFF', borderColor: isDark ? '#374151' : '#E5E7EB' },
+      isBrutalist && styles.brutalistCard,
+      isBrutalist && { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.border }
+    ]}>
       <TouchableOpacity
         style={styles.minimalHeader}
         onPress={toggleExpand}
@@ -91,15 +96,15 @@ const SemesterResultCard = ({ semester }: { semester: ExamScoreSemester }) => {
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flex: 1 }}>
           <View>
-            <Text style={[styles.minimalTitle, { color: colors.text }]}>{semester.semesterName}</Text>
-            <Text style={{ fontSize: 12, color: colors.subText }}>
+            <Text style={[styles.minimalTitle, { color: colors.text }, isBrutalist && styles.brutalistText]}>{semester.semesterName}</Text>
+            <Text style={[{ fontSize: 12, color: colors.subText }, isBrutalist && styles.brutalistSubText]}>
               {semester.studentMarksDetailsDTO.length} Subjects
             </Text>
           </View>
 
           <View style={{ alignItems: 'flex-end' }}>
-            <Text style={[styles.minimalSGPA, { color: colors.text }]}>{semester.sgpa.toFixed(2)}</Text>
-            <Text style={{ fontSize: 10, color: colors.subText, textTransform: 'uppercase', letterSpacing: 0.5 }}>SGPA</Text>
+            <Text style={[styles.minimalSGPA, { color: colors.text }, isBrutalist && styles.brutalistText]}>{semester.sgpa.toFixed(2)}</Text>
+            <Text style={[{ fontSize: 10, color: colors.subText, textTransform: 'uppercase', letterSpacing: 0.5 }, isBrutalist && styles.brutalistSubText]}>SGPA</Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -160,7 +165,7 @@ const ExamScheduleScreen = () => {
   const [targetCGPA, setTargetCGPA] = useState('');
   const [predictionMessage, setPredictionMessage] = useState<string | null>(null);
 
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, isBrutalist } = useTheme();
 
   // --- API Calls ---
   const fetchExams = async () => {
@@ -262,10 +267,15 @@ const ExamScheduleScreen = () => {
         renderItem={({ item }) => {
           const details = item.courseDetails ? parseDetails(item.courseDetails) : { name: item.courseName, code: item.courseCode, type: item.evalLevelComponentName };
           return (
-            <View style={[styles.minimalCard, { backgroundColor: isDark ? '#1F2937' : '#FFFFFF', borderColor: isDark ? '#374151' : '#E5E7EB' }]}>
+            <View style={[
+              styles.minimalCard,
+              { backgroundColor: isDark ? '#1F2937' : '#FFFFFF', borderColor: isDark ? '#374151' : '#E5E7EB' },
+              isBrutalist && styles.brutalistCard,
+              isBrutalist && { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.border }
+            ]}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                <Text style={[styles.minimalTitle, { color: colors.text }]}>{details.name}</Text>
-                <Text style={[styles.minimalCode, { color: colors.primary, fontWeight: '600' }]}>{details.code}</Text>
+                <Text style={[styles.minimalTitle, { color: colors.text }, isBrutalist && styles.brutalistText]}>{details.name}</Text>
+                <Text style={[styles.minimalCode, { color: colors.primary, fontWeight: '600' }, isBrutalist && styles.brutalistSubText]}>{details.code}</Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Icon name="time-outline" size={14} color={colors.subText} style={{ marginRight: 6 }} />
@@ -297,16 +307,16 @@ const ExamScheduleScreen = () => {
           <View style={{ marginBottom: 24 }}>
             {/* Overall CGPA - Clean Minimal */}
             <View style={{ alignItems: 'center', marginBottom: 24 }}>
-              <Text style={{ fontSize: 56, fontWeight: '200', color: colors.text, letterSpacing: -1 }}>
+              <Text style={[{ fontSize: 56, fontWeight: '200', color: colors.text, letterSpacing: -1 }, isBrutalist && styles.brutalistText]}>
                 {results!.cgpa.toFixed(2)}
               </Text>
-              <Text style={{ fontSize: 12, color: colors.subText, textTransform: 'uppercase', letterSpacing: 1.5, marginTop: -5 }}>
+              <Text style={[{ fontSize: 12, color: colors.subText, textTransform: 'uppercase', letterSpacing: 1.5, marginTop: -5 }, isBrutalist && styles.brutalistSubText]}>
                 Current CGPA
               </Text>
             </View>
 
             {/* Modern Calculator Card */}
-            <View style={{
+            <View style={[{
               marginTop: 10,
               marginBottom: 20,
               backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
@@ -319,14 +329,21 @@ const ExamScheduleScreen = () => {
               shadowOpacity: 0.05,
               shadowRadius: 4,
               elevation: 2
-            }}>
+            },
+            isBrutalist && styles.brutalistCard,
+            isBrutalist && { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.border }
+            ]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                <View style={{ backgroundColor: isDark ? '#374151' : '#F3F4F6', padding: 8, borderRadius: 10, marginRight: 12 }}>
+                <View style={[
+                  { backgroundColor: isDark ? '#374151' : '#F3F4F6', padding: 8, borderRadius: 10, marginRight: 12 },
+                  isBrutalist && styles.brutalistIconContainer,
+                  isBrutalist && { backgroundColor: colors.card, borderColor: colors.border }
+                ]}>
                   <Text style={{ fontSize: 20 }}>🎯</Text>
                 </View>
                 <View>
-                  <Text style={[styles.sectionHeader, { color: colors.text, marginBottom: 2 }]}>Future Predicter</Text>
-                  <Text style={{ fontSize: 12, color: colors.subText }}>
+                  <Text style={[styles.sectionHeader, { color: colors.text, marginBottom: 2 }, isBrutalist && styles.brutalistText]}>Future Predicter</Text>
+                  <Text style={[{ fontSize: 12, color: colors.subText }, isBrutalist && styles.brutalistSubText]}>
                     {8 - (results?.studentSemesterWiseMarksDetailsList?.length || 0)} Semesters Remaining
                   </Text>
                 </View>
@@ -355,19 +372,28 @@ const ExamScheduleScreen = () => {
                 </View>
                 <TouchableOpacity
                   onPress={calculateGoal}
-                  style={{
-                    backgroundColor: colors.primary,
-                    paddingHorizontal: 20,
-                    paddingVertical: 10,
-                    borderRadius: 100,
-                    shadowColor: colors.primary,
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.2,
-                    shadowRadius: 8,
-                    elevation: 4
-                  }}
+                  style={[
+                    {
+                      backgroundColor: colors.primary,
+                      paddingHorizontal: 20,
+                      paddingVertical: 10,
+                      borderRadius: 100,
+                      shadowColor: colors.primary,
+                      shadowOffset: { width: 0, height: 4 },
+                      shadowOpacity: 0.2,
+                      shadowRadius: 8,
+                      elevation: 4
+                    },
+                    isBrutalist && {
+                      borderRadius: 0,
+                      borderWidth: 3,
+                      borderColor: colors.border,
+                      shadowOpacity: 0,
+                      elevation: 0
+                    }
+                  ]}
                 >
-                  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 14 }}>Predict</Text>
+                  <Text style={{ color: isBrutalist ? '#000' : '#fff', fontWeight: 'bold', fontSize: 14 }}>Predict</Text>
                 </TouchableOpacity>
               </View>
 
@@ -398,26 +424,46 @@ const ExamScheduleScreen = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[
+      styles.container,
+      { backgroundColor: colors.background },
+      isBrutalist && styles.brutalistContainer,
+      isBrutalist && { backgroundColor: colors.background }
+    ]}>
       {/* Header */}
       <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10 }}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Exams</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }, isBrutalist && styles.brutalistMainTitle]}>Exams</Text>
       </View>
 
       {/* Modern Segmented Tab Switcher */}
       <View style={styles.tabWrapper}>
-        <View style={[styles.tabContainer, { backgroundColor: isDark ? '#1F2937' : '#F3F4F6' }]}>
+        <View style={[
+          styles.tabContainer,
+          { backgroundColor: isDark ? '#1F2937' : '#F3F4F6' },
+          isBrutalist && styles.brutalistTabContainer,
+          isBrutalist && { borderColor: colors.border, backgroundColor: colors.card }
+        ]}>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'Schedule' && styles.activeTab]}
+            style={[
+              styles.tab,
+              activeTab === 'Schedule' && styles.activeTab,
+              isBrutalist && activeTab === 'Schedule' && styles.brutalistActiveTab,
+              isBrutalist && activeTab === 'Schedule' && { borderColor: colors.border, backgroundColor: colors.primary }
+            ]}
             onPress={() => setActiveTab('Schedule')}
           >
-            <Text style={[styles.tabText, { color: activeTab === 'Schedule' ? '#000' : '#6B7280', fontWeight: activeTab === 'Schedule' ? '600' : '400' }]}>Schedule</Text>
+            <Text style={[styles.tabText, { color: activeTab === 'Schedule' ? (isBrutalist ? '#000' : colors.text) : colors.subText, fontWeight: activeTab === 'Schedule' ? '600' : '400' }, isBrutalist && styles.brutalistTabText]}>Schedule</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'Results' && styles.activeTab]}
+            style={[
+              styles.tab,
+              activeTab === 'Results' && styles.activeTab,
+              isBrutalist && activeTab === 'Results' && styles.brutalistActiveTab,
+              isBrutalist && activeTab === 'Results' && { borderColor: colors.border, backgroundColor: colors.primary }
+            ]}
             onPress={() => setActiveTab('Results')}
           >
-            <Text style={[styles.tabText, { color: activeTab === 'Results' ? '#000' : '#6B7280', fontWeight: activeTab === 'Results' ? '600' : '400' }]}>Results</Text>
+            <Text style={[styles.tabText, { color: activeTab === 'Results' ? (isBrutalist ? '#000' : colors.text) : colors.subText, fontWeight: activeTab === 'Results' ? '600' : '400' }, isBrutalist && styles.brutalistTabText]}>Results</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -434,7 +480,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 30,
+    fontSize: 32,
     fontWeight: '700',
     letterSpacing: -0.5,
   },
@@ -467,10 +513,15 @@ const styles = StyleSheet.create({
   },
   // Minimalist Card Styles
   minimalCard: {
-    borderRadius: 12,
+    borderRadius: 24,
     borderWidth: 1,
-    padding: 16,
-    marginBottom: 12,
+    padding: 20,
+    marginBottom: 16,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
   },
   minimalHeader: {
     flexDirection: 'row',
@@ -542,6 +593,41 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     marginTop: 8,
     fontSize: 14
+  },
+  
+  // --- NEO-BRUTALISM OVERRIDES ---
+  brutalistContainer: {},
+  brutalistMainTitle: { fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' },
+  brutalistCard: { 
+    borderRadius: 0, 
+    borderWidth: 4, 
+    shadowOffset: { width: 8, height: 8 }, 
+    shadowOpacity: 1, 
+    shadowRadius: 0,
+    elevation: 0,
+    marginBottom: 24,
+  },
+  brutalistText: { fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase' },
+  brutalistSubText: { fontWeight: '900', textTransform: 'uppercase' },
+  brutalistTabContainer: {
+    borderRadius: 0,
+    borderWidth: 4,
+    padding: 0,
+    marginHorizontal: 4
+  },
+  brutalistActiveTab: {
+    borderRadius: 0,
+    borderWidth: 2,
+    shadowOpacity: 0,
+    elevation: 0
+  },
+  brutalistTabText: {
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  brutalistIconContainer: {
+    borderRadius: 0,
+    borderWidth: 4,
   }
 });
 

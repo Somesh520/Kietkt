@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { InternalAxiosRequestConfig, AxiosHeaderValue } from 'axios';
 import RNBlobUtil from 'react-native-blob-util';
 import { Platform } from 'react-native';
+import CookieManager from '@react-native-cookies/cookies';
 
 const API_BASE_URL = "https://kiet.cybervidya.net/api";
 const AUTH_TOKEN_KEY = 'authToken';
@@ -21,6 +22,44 @@ export const onAuthError = (listener: AuthEventListener) => {
 
 const emitAuthError = () => {
     authErrorListeners.forEach(l => l());
+};
+
+export interface LoginResponse {
+    token: string;
+    // Add other fields if needed
+}
+
+export const loginApi = async (userName: string, password: string): Promise<ApiResponse<LoginResponse>> => {
+    try {
+        console.log(`\n\n=== ATTEMPTING NATIVE LOGIN ===`);
+        console.log(`Endpoint: ${API_BASE_URL}/auth/login`);
+        console.log(`Payload:`, { userName, password });
+
+        const payload = { userName, password };
+        const response = await axios.post(`${API_BASE_URL}/auth/login`, payload);
+        
+        console.log(`=== LOGIN SUCCESSFUL ===`);
+        console.log(`Response Data:`, JSON.stringify(response.data));
+
+        return {
+            success: true,
+            data: response.data
+        };
+    } catch (error: any) {
+        console.log(`\n\n=== LOGIN FAILED ===`);
+        if (error.response) {
+            console.log(`Status Code: ${error.response.status}`);
+            console.log(`Error Response Data:`, JSON.stringify(error.response.data));
+        } else {
+            console.log(`Error Message:`, error.message);
+        }
+
+        return {
+            success: false,
+            data: null as any,
+            error: error.response?.data?.message || error.message || 'Login failed'
+        };
+    }
 };
 
 export interface UserDetails {
@@ -249,10 +288,12 @@ export const logout = async () => {
             'CACHE_PROFILE'
         ]);
 
-        // Also clear cookies via CookieManager if possible (best effort)
-        // Note: This might not work perfectly on your specific Android setup but good to have
-        // You might need to import CookieManager here if not already imported
-        // await CookieManager.clearAll(); 
+        try {
+            await CookieManager.clearAll();
+            console.log('🍪 [api] Cookies cleared successfully via CookieManager.');
+        } catch (cookieError) {
+            console.error('🍪 [api] Error clearing cookies:', cookieError);
+        }
 
         delete apiClient.defaults.headers.common['Authorization'];
     } catch (e) {

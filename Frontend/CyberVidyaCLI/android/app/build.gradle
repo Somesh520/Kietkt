@@ -1,7 +1,6 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
-apply plugin: "com.google.gms.google-services"
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -98,8 +97,8 @@ android {
             universalApk false  // We don't want one single large APK
             // Specify the architectures you want to support.
             // arm64-v8a is for modern 64-bit phones.
-            // armeabi-v7a is for older 32-bit phones.
-            include "armeabi-v7a", "arm64-v8a"
+            // arm64-v8a covers all modern 64-bit Android phones.
+            include "arm64-v8a"
         }
     }
 
@@ -128,3 +127,4 @@ dependencies {
     }
 }
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
+apply plugin: "com.google.gms.google-services"

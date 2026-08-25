@@ -21,7 +21,6 @@ import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../ThemeContext';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { getStudentProfileInfo, StudentProfile } from '../api';
-import notifee from '@notifee/react-native';
 
 // ... Types & Interfaces ...
 interface TeamMember {
@@ -53,7 +52,7 @@ interface StatusConfigItem {
 }
 
 // ... Constants ...
-const CURRENT_APP_VERSION = "v1.1.5";
+const CURRENT_APP_VERSION = "v1.1.6";
 const UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Somesh520/Kietkt/main/update.json";
 
 // ... Data ...
@@ -98,6 +97,7 @@ const SimpleIcon = ({ name, size = 20, color = '#333' }: SimpleIconProps) => {
     case 'github': iconChar = '🐙'; break;
     case 'arrow-right': iconChar = '→'; break;
     case 'person': iconChar = '👤'; break;
+    case 'simulator': iconChar = '✈️'; break;
     default: iconChar = '•';
   }
   return <Text style={{ fontSize: size, color: color }}>{iconChar}</Text>;
@@ -124,7 +124,7 @@ const ScaleButton = ({ onPress, style, children }: ScaleButtonProps) => {
 };
 
 const ProfileScreen = ({ onLogout }: { onLogout: () => void }) => {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, isBrutalist, toggleBrutalist } = useTheme();
   const navigation = useNavigation<any>();
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('checking');
@@ -195,41 +195,33 @@ const ProfileScreen = ({ onLogout }: { onLogout: () => void }) => {
   // ... Render functions ...
   const renderUpdateCard = () => {
     const statusMap: Record<UpdateStatus, StatusConfigItem> = {
-      checking: { icon: 'refresh', color: '#6366f1', bg: '#e0e7ff', text: 'Checking...' },
-      latest: { icon: 'check', color: '#10b981', bg: '#d1fae5', text: 'You are up to date' },
-      available: { icon: 'download', color: '#f59e0b', bg: '#fef3c7', text: 'Update Available' },
-      error: { icon: 'alert', color: '#ef4444', bg: '#fee2e2', text: 'Retry Check' },
+      checking: { icon: 'refresh', color: '#6366f1', bg: isDark ? '#1e1b4b' : '#e0e7ff', text: 'Checking...' },
+      latest: { icon: 'check', color: '#10b981', bg: isDark ? '#064e3b' : '#d1fae5', text: 'You are up to date' },
+      available: { icon: 'download', color: '#f59e0b', bg: isDark ? '#78350f' : '#fef3c7', text: 'Update Available' },
+      error: { icon: 'alert', color: '#ef4444', bg: isDark ? '#7f1d1d' : '#fee2e2', text: 'Retry Check' },
     };
 
     const config = statusMap[updateStatus];
 
     return (
-      <ScaleButton onPress={handleUpdatePress} style={[styles.card, { backgroundColor: colors.card }]}>
+      <ScaleButton onPress={handleUpdatePress} style={[
+        styles.card,
+        { backgroundColor: colors.card },
+        isBrutalist ? styles.brutalistCard : undefined,
+        isBrutalist ? { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.border } : undefined
+      ]}>
         <View style={styles.cardHeader}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>App Version</Text>
-          <View style={[styles.badge, { backgroundColor: isDark ? '#333' : '#f3f4f6' }]}>
-            <Text style={[styles.badgeText, { color: colors.subText }]}>{CURRENT_APP_VERSION}</Text>
+          <Text style={[styles.cardTitle, { color: colors.text }, isBrutalist ? styles.brutalistText : undefined]}>App Version</Text>
+          <View style={[
+            styles.badge,
+            { backgroundColor: isDark ? '#333' : '#f3f4f6' },
+            isBrutalist ? styles.brutalistBadge : undefined,
+            isBrutalist ? { backgroundColor: colors.card, borderColor: colors.border } : undefined
+          ]}>
+            <Text style={[styles.badgeText, { color: colors.subText }, isBrutalist ? styles.brutalistText : undefined]}>{CURRENT_APP_VERSION}</Text>
           </View>
         </View>
 
-
-        <TouchableOpacity
-          style={[styles.menuItem, { borderBottomColor: colors.border }]}
-          onPress={() => {
-            Alert.alert(
-              "Hide Status Notification",
-              "This will open system settings. Turn OFF 'Background Sync' notification to hide the status bar icon while keeping attendance sync active.",
-              [
-                { text: "Cancel", style: "cancel" },
-                { text: "Open Settings", onPress: () => notifee.openNotificationSettings('fg_silent_v2') }
-              ]
-            );
-          }}
-        >
-          <Icon name="eye-off-outline" size={24} color={colors.primary} />
-          <Text style={[styles.menuText, { color: colors.text }]}>Hide Status App</Text>
-          <Icon name="chevron-forward" size={20} color={colors.subText} />
-        </TouchableOpacity>
 
 
 
@@ -247,22 +239,36 @@ const ProfileScreen = ({ onLogout }: { onLogout: () => void }) => {
   };
 
   return (
-    <View style={[styles.mainContainer, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle="light-content" backgroundColor="#4f46e5" />
+    <View style={[
+      styles.mainContainer,
+      { backgroundColor: colors.background },
+      isBrutalist ? styles.brutalistMain : undefined,
+      isBrutalist ? { backgroundColor: colors.background } : undefined
+    ]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isBrutalist ? colors.background : "#4f46e5"} />
 
-      <View style={styles.headerContainer}>
-        <Animated.View style={[styles.blob, {
+      <View style={[
+        styles.headerContainer,
+        {
+          backgroundColor: isBrutalist ? colors.primary : '#4f46e5',
+          borderColor: isBrutalist ? colors.border : '#eee'
+        },
+        isBrutalist ? styles.brutalistHeader : undefined,
+      ]}>
+        <Animated.View style={[styles.blob, { display: isBrutalist ? 'none' : 'flex' }, {
           backgroundColor: '#6366f1', top: -50, right: -50, width: 200, height: 200,
+          opacity: 0.5,
           transform: [{ translateY: headerAnim.interpolate({ inputRange: [0, 1], outputRange: [-100, 0] }) }]
         }]} />
-        <Animated.View style={[styles.blob, {
+        <Animated.View style={[styles.blob, { display: isBrutalist ? 'none' : 'flex' }, {
           backgroundColor: '#818cf8', bottom: -80, left: -50, width: 250, height: 250,
+          opacity: 0.5,
           transform: [{ scale: headerAnim }]
         }]} />
 
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>About App</Text>
-          <Text style={styles.headerSubtitle}>Built for Students, by Students.</Text>
+          <Text style={[styles.headerTitle, isBrutalist ? styles.brutalistText : undefined, { color: isBrutalist ? '#000' : '#fff' }]}>About App</Text>
+          <Text style={[styles.headerSubtitle, isBrutalist ? styles.brutalistSubText : undefined, { color: isBrutalist ? '#000' : '#e0e7ff' }]}>Built for Students, by Students.</Text>
         </View>
       </View>
 
@@ -271,8 +277,13 @@ const ProfileScreen = ({ onLogout }: { onLogout: () => void }) => {
 
           {renderUpdateCard()}
 
-          <Text style={styles.sectionLabel}>THE CREATORS</Text>
-          <View style={[styles.card, { backgroundColor: colors.card }]}>
+          <Text style={[styles.sectionLabel, { color: colors.subText }, isBrutalist ? styles.brutalistText : undefined]}>THE CREATORS</Text>
+          <View style={[
+            styles.card,
+            { backgroundColor: colors.card },
+            isBrutalist ? styles.brutalistCard : undefined,
+            isBrutalist ? { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.border } : undefined
+          ]}>
             {teamMembers.map((member, index) => (
               <View key={member.name}>
                 <ScaleButton onPress={() => handleLinkPress(member.linkedinUrl)}>
@@ -280,53 +291,127 @@ const ProfileScreen = ({ onLogout }: { onLogout: () => void }) => {
                     {member.imageUrl ? (
                       <Image
                         source={{ uri: member.imageUrl }}
-                        style={[styles.avatarImage, { backgroundColor: isDark ? '#333' : '#eee' }]}
+                        style={[
+                          styles.avatarImage,
+                          { backgroundColor: isDark ? '#333' : '#eee' },
+                          isBrutalist ? styles.brutalistAvatar : undefined,
+                          isBrutalist ? { borderColor: colors.border } : undefined
+                        ]}
                       />
                     ) : (
-                      <View style={[styles.iconBox, { backgroundColor: '#c7d2fe' }]}>
-                        <SimpleIcon name="person" color="#fff" />
+                      <View style={[
+                        styles.iconBox,
+                        { backgroundColor: '#c7d2fe' },
+                        isBrutalist ? styles.brutalistIconBox : undefined,
+                        isBrutalist ? { borderColor: colors.border } : undefined
+                      ]}>
+                        <SimpleIcon name="person" color={isBrutalist ? '#000' : '#fff'} />
                       </View>
                     )}
 
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.rowTitle, { color: colors.text }]}>{member.name}</Text>
-                      <Text style={[styles.rowSub, { color: colors.subText }]}>{member.role}</Text>
+                      <Text style={[styles.rowTitle, { color: colors.text }, isBrutalist ? styles.brutalistText : undefined]}>{member.name}</Text>
+                      <Text style={[styles.rowSub, { color: colors.subText }, isBrutalist ? styles.brutalistSubText : undefined]}>{member.role}</Text>
                     </View>
                     <SimpleIcon name="linkedin" color="#0077b5" />
                   </View>
                 </ScaleButton>
-                {index < teamMembers.length - 1 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
+                {index < teamMembers.length - 1 && <View style={[
+                  styles.divider,
+                  { backgroundColor: colors.border },
+                  isBrutalist ? styles.brutalistDivider : undefined,
+                  isBrutalist ? { backgroundColor: colors.border } : undefined
+                ]} />}
               </View>
             ))}
           </View>
 
-          <Text style={styles.sectionLabel}>INFORMATION</Text>
-          <View style={[styles.card, { backgroundColor: colors.card }]}>
+          <Text style={[styles.sectionLabel, { color: colors.subText }, isBrutalist ? styles.brutalistText : undefined]}>INFORMATION</Text>
+          <View style={[
+            styles.card,
+            { backgroundColor: colors.card },
+            isBrutalist ? styles.brutalistCard : undefined,
+            isBrutalist ? { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.border } : undefined
+          ]}>
             <View style={styles.row}>
-              <View style={[styles.iconBox, { backgroundColor: isDark ? '#064e3b' : '#d1fae5' }]}>
-                <SimpleIcon name="shield" color="#10b981" />
+              <View style={[
+                styles.iconBox,
+                { backgroundColor: isDark ? '#064e3b' : '#d1fae5' },
+                isBrutalist ? styles.brutalistIconBox : undefined,
+                isBrutalist ? { borderColor: colors.border } : undefined
+              ]}>
+                <SimpleIcon name="shield" color={isBrutalist ? '#000' : '#10b981'} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.rowTitle, { color: colors.text }]}>100% Secure</Text>
-                <Text style={[styles.rowSub, { color: colors.subText }]}>Data is fetched directly from CyberVidya.</Text>
+                <Text style={[styles.rowTitle, { color: colors.text }, isBrutalist ? styles.brutalistText : undefined]}>100% Secure</Text>
+                <Text style={[styles.rowSub, { color: colors.subText }, isBrutalist ? styles.brutalistSubText : undefined]}>Data is fetched directly from CyberVidya.</Text>
               </View>
             </View>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <View style={[
+              styles.divider,
+              { backgroundColor: colors.border },
+              isBrutalist ? styles.brutalistDivider : undefined,
+              isBrutalist ? { backgroundColor: colors.border } : undefined
+            ]} />
             <ScaleButton onPress={() => handleLinkPress('https://github.com/Somesh520/Kietkt')}>
               <View style={styles.row}>
-                <View style={[styles.iconBox, { backgroundColor: isDark ? '#374151' : '#e5e7eb' }]}>
-                  <SimpleIcon name="github" color={isDark ? '#fff' : '#1f2937'} />
+                <View style={[
+                  styles.iconBox,
+                  { backgroundColor: isDark ? '#374151' : '#e5e7eb' },
+                  isBrutalist ? styles.brutalistIconBox : undefined,
+                  isBrutalist ? { borderColor: colors.border } : undefined
+                ]}>
+                  <SimpleIcon name="github" color={isBrutalist ? '#000' : (isDark ? '#fff' : '#1f2937')} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.rowTitle, { color: colors.text }]}>Open Source</Text>
-                  <Text style={[styles.rowSub, { color: colors.subText }]}>View code on GitHub</Text>
+                  <Text style={[styles.rowTitle, { color: colors.text }, isBrutalist ? styles.brutalistText : undefined]}>Open Source</Text>
+                  <Text style={[styles.rowSub, { color: colors.subText }, isBrutalist ? styles.brutalistSubText : undefined]}>View code on GitHub</Text>
                 </View>
-                <SimpleIcon name="arrow-right" color={colors.subText} />
+                <SimpleIcon name="arrow-right" color={isBrutalist ? '#000' : colors.subText} />
               </View>
             </ScaleButton>
           </View>
 
-          <Text style={styles.footer}>Made with ❤️ by Someshxd</Text>
+          <Text style={[styles.sectionLabel, { color: colors.subText }, isBrutalist ? styles.brutalistText : undefined]}>APPEARANCE</Text>
+          <View style={[
+            styles.card,
+            { backgroundColor: colors.card },
+            isBrutalist ? styles.brutalistCard : undefined,
+            isBrutalist ? { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.border } : undefined
+          ]}>
+            <ScaleButton onPress={toggleBrutalist}>
+              <View style={styles.row}>
+                <View style={[
+                  styles.iconBox,
+                  { backgroundColor: isBrutalist ? '#2980b9' : (isDark ? '#374151' : '#e5e7eb') },
+                  isBrutalist ? styles.brutalistIconBox : undefined,
+                  isBrutalist ? { borderColor: colors.border } : undefined
+                ]}>
+                  <Icon name="color-palette" size={20} color={isBrutalist ? '#fff' : (isDark ? '#fff' : '#1f2937')} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.rowTitle, { color: colors.text }, isBrutalist ? styles.brutalistText : undefined]}>Neo-Brutalism Mode</Text>
+                  <Text style={[styles.rowSub, { color: colors.subText }, isBrutalist ? styles.brutalistSubText : undefined]}>{isBrutalist ? 'Enabled' : 'Disabled'}</Text>
+                </View>
+                <View style={[
+                  styles.toggleSwitch,
+                  { backgroundColor: isDark ? '#334155' : '#e5e7eb' },
+                  isBrutalist ? styles.toggleSwitchActive : undefined,
+                  isBrutalist ? styles.brutalistToggleSwitch : undefined,
+                  isBrutalist ? { borderColor: colors.border, backgroundColor: colors.primary } : undefined
+                ]}>
+                  <View style={[
+                    styles.toggleThumb,
+                    isBrutalist ? styles.toggleThumbActive : undefined,
+                    isBrutalist ? styles.brutalistToggleThumb : undefined,
+                    isBrutalist ? { borderColor: colors.border, backgroundColor: colors.card } : undefined
+                  ]} />
+                </View>
+              </View>
+            </ScaleButton>
+          </View>
+
+          <Text style={[styles.footer, { color: colors.subText }, isBrutalist ? styles.brutalistText : undefined]}>Made with ❤️ by Someshxd</Text>
           <View style={{ height: 50 }} />
 
         </Animated.View>
@@ -340,7 +425,7 @@ export default ProfileScreen;
 const styles = StyleSheet.create({
   mainContainer: { flex: 1, backgroundColor: '#f3f4f6' },
   headerContainer: {
-    height: 220,
+    height: 240,
     backgroundColor: '#4f46e5',
     overflow: 'hidden',
     justifyContent: 'center',
@@ -363,17 +448,17 @@ const styles = StyleSheet.create({
     marginLeft: 15,
   },
   blob: { position: 'absolute', borderRadius: 999, opacity: 0.5 },
-  headerContent: { marginTop: 20, zIndex: 10 },
-  headerTitle: { fontSize: 36, fontWeight: 'bold', color: '#fff' },
-  headerSubtitle: { fontSize: 16, color: '#e0e7ff', marginTop: 5 },
+  headerContent: { marginTop: 20, zIndex: 10, paddingHorizontal: 24 },
+  headerTitle: { fontSize: 36, fontWeight: '700', color: '#fff', letterSpacing: -0.5 },
+  headerSubtitle: { fontSize: 16, color: '#e0e7ff', marginTop: 5, fontWeight: '500' },
   scrollContent: { padding: 20, paddingTop: 30 },
-  sectionLabel: { fontSize: 12, fontWeight: 'bold', color: '#9ca3af', marginBottom: 10, marginLeft: 5, marginTop: 20 },
-  card: { backgroundColor: '#fff', borderRadius: 20, padding: 5, elevation: 3, overflow: 'hidden' },
+  sectionLabel: { fontSize: 13, fontWeight: '700', color: '#9ca3af', marginBottom: 12, marginLeft: 8, marginTop: 20, letterSpacing: 1 },
+  card: { backgroundColor: '#fff', borderRadius: 24, padding: 8, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 12 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15 },
-  cardTitle: { fontSize: 18, fontWeight: 'bold', color: '#1f2937' },
-  badge: { backgroundColor: '#f3f4f6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  badgeText: { fontSize: 12, fontWeight: 'bold', color: '#4b5563' },
-  statusRow: { flexDirection: 'row', alignItems: 'center', padding: 12, margin: 10, borderRadius: 12 },
+  cardTitle: { fontSize: 18, fontWeight: '700', color: '#1f2937' },
+  badge: { backgroundColor: '#f3f4f6', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
+  badgeText: { fontSize: 12, fontWeight: '700', color: '#4b5563' },
+  statusRow: { flexDirection: 'row', alignItems: 'center', padding: 16, margin: 10, borderRadius: 16 },
   statusText: { marginLeft: 10, fontWeight: '600', fontSize: 14 },
   newVersionText: { textAlign: 'center', color: '#f59e0b', marginBottom: 10, fontWeight: 'bold' },
   row: { flexDirection: 'row', alignItems: 'center', padding: 15 },
@@ -383,4 +468,31 @@ const styles = StyleSheet.create({
   rowSub: { fontSize: 12, color: '#6b7280', marginTop: 2 },
   divider: { height: 1, backgroundColor: '#f3f4f6', marginLeft: 70 },
   footer: { textAlign: 'center', color: '#9ca3af', marginTop: 30 },
+  toggleSwitch: { width: 50, height: 26, borderRadius: 13, backgroundColor: '#e5e7eb', justifyContent: 'center', padding: 2 },
+  toggleSwitchActive: { backgroundColor: '#2980b9' },
+  toggleThumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', transform: [{ translateX: 0 }] },
+  toggleThumbActive: { transform: [{ translateX: 24 }] },
+
+  // --- NEO-BRUTALISM OVERRIDES ---
+  brutalistMain: {},
+  brutalistHeader: { backgroundColor: '#EF476F', borderBottomWidth: 4, borderRadius: 0 },
+  brutalistText: { fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' },
+  brutalistSubText: { fontWeight: '900', textTransform: 'uppercase' },
+  brutalistCard: { 
+    borderRadius: 0, 
+    borderWidth: 4, 
+    shadowOffset: { width: 8, height: 8 }, 
+    shadowOpacity: 1, 
+    shadowRadius: 0,
+    elevation: 0,
+    marginHorizontal: 10,
+    marginBottom: 20,
+    overflow: 'hidden',
+  },
+  brutalistIconBox: { borderRadius: 0, borderWidth: 3 },
+  brutalistAvatar: { borderRadius: 0, borderWidth: 3 },
+  brutalistDivider: { height: 4, marginLeft: 0 },
+  brutalistBadge: { borderRadius: 0, borderWidth: 3 },
+  brutalistToggleSwitch: { borderRadius: 0, borderWidth: 3, padding: 0 },
+  brutalistToggleThumb: { borderRadius: 0, borderWidth: 2, width: 20, height: 20 },
 });

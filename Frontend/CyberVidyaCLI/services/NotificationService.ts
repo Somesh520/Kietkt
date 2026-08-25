@@ -98,6 +98,15 @@ class NotificationService {
         }
     }
 
+    async unsubscribeFromTopic() {
+        try {
+            await messaging().unsubscribeFromTopic('students');
+            console.log('✅ Unsubscribed from "students" topic');
+        } catch (error) {
+            console.log('❌ Error unsubscribing from "students" topic:', error);
+        }
+    }
+
     // 3. Listen for Foreground Messages
     listen() {
         // Foreground State

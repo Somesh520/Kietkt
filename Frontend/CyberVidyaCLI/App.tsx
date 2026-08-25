@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, ActivityIndicator, StyleSheet, StatusBar, Text, TouchableOpacity, Alert, Linking } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, StatusBar, Text, TouchableOpacity, Alert, Linking, Animated } from 'react-native';
 
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
@@ -8,7 +8,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import Icon from 'react-native-vector-icons/Ionicons';
 import axios from 'axios';
-import BackgroundFetch from 'react-native-background-fetch';
 
 // 🔥 ADVANCED MODULAR ANALYTICS IMPORT
 import {
@@ -29,13 +28,13 @@ import CourseDetailsScreen from './Screen/CourseDetailsScreen';
 import ExamScheduleScreen from './Screen/Exams';
 import HallTicketScreen from './Screen/HallTicketScreen';
 import NotificationSettings from './Screen/NotificationSettings';
+import TripPlannerScreen from './Screen/TripPlannerScreen';
 import SplashScreen from './Screen/SplashScreen';
 import { logout, onAuthError } from './api';
 import NotificationService from './services/NotificationService';
-import AttendanceScheduler from './services/AttendanceScheduler';
 
 const AUTH_TOKEN_KEY = 'authToken';
-const CURRENT_APP_VERSION = "v1.1.5";
+const CURRENT_APP_VERSION = "v1.1.6";
 const UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/Somesh520/Kietkt/main/update.json";
 
 const Tab = createBottomTabNavigator();
@@ -48,30 +47,59 @@ type AuthProps = {
 // --- Custom Exam Manager ---
 function ExamManagerScreen() {
   const [viewMode, setViewMode] = useState<'schedule' | 'ticket'>('schedule');
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, isBrutalist } = useTheme();
+  const underlineAnim = useRef(new Animated.Value(0)).current;
+
+  const switchTab = (mode: 'schedule' | 'ticket') => {
+    setViewMode(mode);
+    Animated.spring(underlineAnim, {
+      toValue: mode === 'schedule' ? 0 : 1,
+      friction: 8, tension: 60, useNativeDriver: true,
+    }).start();
+    logEvent(getAnalytics(), 'select_content', { content_type: 'exam_tab', item_id: mode === 'schedule' ? 'datesheet' : 'hall_ticket' });
+  };
+
+  const brutBorder = isDark ? '#FFF' : '#000';
 
   return (
     <SafeAreaView style={[styles.examContainer, { backgroundColor: colors.background }]}>
-      <View style={[styles.toggleContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity
-          style={[styles.toggleBtn, viewMode === 'schedule' && { borderBottomColor: colors.primary }]}
-          onPress={async () => {
-            setViewMode('schedule');
-            await logEvent(getAnalytics(), 'select_content', { content_type: 'exam_tab', item_id: 'datesheet' });
-          }}
-        >
-          <Text style={[styles.toggleText, { color: colors.subText }, viewMode === 'schedule' && { color: colors.primary, fontWeight: 'bold' }]}>Datesheet</Text>
+      <View style={[
+        styles.toggleContainer,
+        { backgroundColor: colors.card, borderBottomColor: colors.border },
+        isBrutalist && { borderBottomWidth: 4, borderColor: brutBorder }
+      ]}>
+        <TouchableOpacity style={styles.toggleBtn} onPress={() => switchTab('schedule')}>
+          <Text style={[
+            styles.toggleText,
+            { color: viewMode === 'schedule' ? colors.primary : colors.subText },
+            viewMode === 'schedule' && { fontWeight: 'bold' },
+            isBrutalist && { fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1 }
+          ]}>Datesheet</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.toggleBtn, viewMode === 'ticket' && { borderBottomColor: colors.primary }]}
-          onPress={async () => {
-            setViewMode('ticket');
-            await logEvent(getAnalytics(), 'select_content', { content_type: 'exam_tab', item_id: 'hall_ticket' });
-          }}
-        >
-          <Text style={[styles.toggleText, { color: colors.subText }, viewMode === 'ticket' && { color: colors.primary, fontWeight: 'bold' }]}>Hall Ticket</Text>
+        <TouchableOpacity style={styles.toggleBtn} onPress={() => switchTab('ticket')}>
+          <Text style={[
+            styles.toggleText,
+            { color: viewMode === 'ticket' ? colors.primary : colors.subText },
+            viewMode === 'ticket' && { fontWeight: 'bold' },
+            isBrutalist && { fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1 }
+          ]}>Hall Ticket</Text>
         </TouchableOpacity>
+
+        {/* Animated Sliding Underline */}
+        <Animated.View style={[
+          styles.tabUnderline,
+          { backgroundColor: colors.primary },
+          isBrutalist && { height: 4, backgroundColor: isDark ? '#FFD166' : '#000' },
+          {
+            transform: [{
+              translateX: underlineAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 180], // approximate half-width shift
+              })
+            }]
+          }
+        ]} />
       </View>
 
       <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -81,8 +109,44 @@ function ExamManagerScreen() {
   );
 }
 
+function AnimatedTabIcon({ name, focused, size, color }: { name: string; focused: boolean; size: number; color: string }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  React.useEffect(() => {
+    if (focused) {
+      Animated.sequence([
+        Animated.timing(scale, { toValue: 1.25, duration: 150, useNativeDriver: true }),
+        Animated.spring(scale, { toValue: 1, friction: 4, useNativeDriver: true }),
+      ]).start();
+    } else {
+      scale.setValue(1);
+    }
+  }, [focused]);
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Icon name={name} size={size} color={color} />
+    </Animated.View>
+  );
+}
+
+// --- Global action callback for navigation wrappers ---
+let globalOnLogout: (() => void) | null = null;
+
+// --- Navigation wrappers to prevent unmount/remount on render ---
+const HomeScreenWrapper = () => {
+  return <HomeScreen onLogout={globalOnLogout || (() => { })} />;
+};
+
+const ProfileScreenWrapper = () => {
+  return <ProfileScreen onLogout={globalOnLogout || (() => { })} />;
+};
+
+const MainAppTabsWrapper = () => {
+  return <MainAppTabs onLogout={globalOnLogout || (() => { })} />;
+};
+
 function MainAppTabs({ onLogout }: AuthProps) {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, isBrutalist, typography, spacing } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -92,48 +156,69 @@ function MainAppTabs({ onLogout }: AuthProps) {
           else if (route.name === 'Timetable') iconName = focused ? 'calendar' : 'calendar-outline';
           else if (route.name === 'Exams') iconName = focused ? 'school' : 'school-outline';
           else if (route.name === 'About us') iconName = focused ? 'person-circle' : 'person-circle-outline';
-          return <Icon name={iconName} size={size} color={focused ? colors.primary : colors.subText} />;
+          return <AnimatedTabIcon name={iconName} focused={focused} size={size} color={focused ? colors.primary : colors.subText} />;
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.subText,
         headerShown: false,
-        tabBarStyle: {
-          height: 60,
-          paddingBottom: 5,
-          paddingTop: 5,
-          backgroundColor: colors.tabBar,
-          borderTopWidth: 0,
-          elevation: 5
-        },
-        tabBarLabelStyle: { fontSize: 12 },
+        tabBarStyle: [
+          {
+            height: 65,
+            paddingBottom: spacing.sm,
+            paddingTop: spacing.xs,
+            backgroundColor: colors.tabBar,
+            borderTopWidth: 0,
+            elevation: 10,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -2 },
+            shadowOpacity: 0.08,
+            shadowRadius: 12
+          },
+          isBrutalist && {
+            borderTopWidth: 4,
+            borderColor: isDark ? '#FFF' : '#000',
+            backgroundColor: colors.tabBar,
+            borderRadius: 0,
+            shadowColor: isDark ? '#FFF' : '#000',
+            shadowOffset: { width: 0, height: -4 },
+            shadowOpacity: 1,
+            shadowRadius: 0,
+            elevation: 0,
+          }
+        ],
+        tabBarLabelStyle: [
+          typography.caption,
+          { marginTop: -2 }
+        ],
         tabBarHideOnKeyboard: true,
       })}
     >
-      <Tab.Screen name="Home" children={() => <HomeScreen onLogout={onLogout} />} />
+      <Tab.Screen name="Home" component={HomeScreenWrapper} />
       <Tab.Screen name="Timetable" component={TimetableScreen} />
       <Tab.Screen name="Exams" component={ExamManagerScreen} />
-      <Tab.Screen name="About us" children={() => <ProfileScreen onLogout={onLogout} />} />
+      <Tab.Screen name="About us" component={ProfileScreenWrapper} />
     </Tab.Navigator>
   );
 }
 
 function AppStack({ onLogout }: AuthProps) {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, isBrutalist, typography } = useTheme();
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: {
-          backgroundColor: colors.card,
-        },
+        headerStyle: [
+          { backgroundColor: colors.headerBg },
+          isBrutalist && { borderBottomWidth: 4, borderColor: '#000', elevation: 0, shadowOpacity: 0 }
+        ],
         headerTintColor: colors.text,
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
+        headerTitleStyle: [
+          typography.h2,
+        ],
       }}
     >
       <Stack.Screen
         name="MainTabs"
-        children={() => <MainAppTabs onLogout={onLogout} />}
+        component={MainAppTabsWrapper}
         options={{ headerShown: false }}
       />
       <Stack.Screen
@@ -145,6 +230,11 @@ function AppStack({ onLogout }: AuthProps) {
         name="NotificationSettings"
         component={NotificationSettings}
         options={{ title: 'Notification Center' }}
+      />
+      <Stack.Screen
+        name="TripPlanner"
+        component={TripPlannerScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
@@ -177,7 +267,7 @@ function App(): React.JSX.Element {
   useEffect(() => {
     const unsubscribe = onAuthError(() => {
       console.log("🚨 Auth Error Received! Logging out...");
-      handleLogout();
+      handleLogout(true);
     });
     return unsubscribe;
   }, []);
@@ -235,11 +325,6 @@ function App(): React.JSX.Element {
       const hasPermission = await NotificationService.requestUserPermission();
       if (hasPermission) {
         await NotificationService.getFCMToken();
-        // 🗓️ Schedule Initial
-        await AttendanceScheduler.scheduleNotifications();
-
-        // 🛡️ Start Foreground Service for Reliability
-        await NotificationService.startForegroundService();
       }
     };
 
@@ -252,33 +337,6 @@ function App(): React.JSX.Element {
         unsubscribe();
       }
     };
-  }, []);
-
-  // 4. Background Fetch Implementation (Periodic Sync)
-  useEffect(() => {
-    const initBackgroundFetch = async () => {
-      const status = await BackgroundFetch.configure({
-        minimumFetchInterval: 60, // Fetch every 60 minutes
-        stopOnTerminate: false,
-        startOnBoot: true,
-        enableHeadless: true,
-        requiredNetworkType: BackgroundFetch.NETWORK_TYPE_ANY,
-        forceAlarmManager: true, // ⚠️ Reliable Trigger on older devices/OEMs
-      }, async (taskId) => {
-        console.log('[BackgroundFetch] taskId: ', taskId);
-
-        // Synch Logic
-        await AttendanceScheduler.scheduleNotifications();
-
-        // Finish
-        BackgroundFetch.finish(taskId);
-      }, (error) => {
-        console.log('[BackgroundFetch] failed to start');
-      });
-      console.log('[BackgroundFetch] configure status: ', status);
-    };
-
-    initBackgroundFetch();
   }, []);
 
   // 2. 🚀 UPDATE CHECK (Pop-up Alert Logic)
@@ -354,8 +412,16 @@ function App(): React.JSX.Element {
     await logEvent(getAnalytics(), 'login', { method: 'cybervidya_app' });
   };
 
-  const handleLogout = async (): Promise<void> => {
+  const handleLogout = async (showSessionExpiredAlert = false): Promise<void> => {
     try {
+      if (showSessionExpiredAlert) {
+        Alert.alert('Session Expired', 'Your session has expired. Please log in again.');
+      }
+      try {
+        await NotificationService.unsubscribeFromTopic();
+      } catch (e) {
+        console.log('FCM Unsubscribe error:', e);
+      }
       await logout();
       await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
       await AsyncStorage.removeItem('authTokenTimestamp'); // Clear timestamp
@@ -374,7 +440,9 @@ function App(): React.JSX.Element {
     }
   };
 
-  const { colors, isDark } = useTheme();
+  globalOnLogout = handleLogout;
+
+  const { colors, isDark, isBrutalist } = useTheme();
 
   return (
     <SafeAreaProvider>
@@ -447,10 +515,9 @@ const styles = StyleSheet.create({
   },
   safeArea: { flex: 1, backgroundColor: 'transparent' },
   examContainer: { flex: 1, backgroundColor: '#fff' },
-  toggleContainer: { flexDirection: 'row', backgroundColor: '#fff', paddingVertical: 10, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#eee', justifyContent: 'center' },
-  toggleBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  toggleBtnActive: { borderBottomColor: '#2980b9' },
+  toggleContainer: { flexDirection: 'row', backgroundColor: '#fff', paddingVertical: 10, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#eee', justifyContent: 'center', position: 'relative' },
+  toggleBtn: { flex: 1, paddingVertical: 10, alignItems: 'center' },
   toggleText: { fontSize: 16, color: '#888', fontWeight: '500' },
-  toggleTextActive: { color: '#2980b9', fontWeight: 'bold' },
+  tabUnderline: { position: 'absolute', bottom: 0, left: 20, width: '45%', height: 3, borderRadius: 2 },
   container: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });

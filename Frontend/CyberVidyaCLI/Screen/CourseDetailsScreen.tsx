@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, FlatList, StatusBar, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute } from '@react-navigation/native';
 import { getLectureWiseAttendance, Lecture } from '../api';
 import Icon from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
-// ✅ Import Shimmer Placeholder
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createShimmerPlaceholder } from 'react-native-shimmer-placeholder';
 import { useTheme } from '../ThemeContext';
 
@@ -13,7 +13,7 @@ const ShimmerPlaceholder = createShimmerPlaceholder(LinearGradient);
 
 // --- UI Component for single Lecture Item ---
 const LectureItem = ({ item }: { item: Lecture }) => {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, isBrutalist } = useTheme();
   const isPresent = item.attendance === 'PRESENT';
 
   const [year, month, day] = item.planLecDate.split('-').map(Number);
@@ -25,25 +25,66 @@ const LectureItem = ({ item }: { item: Lecture }) => {
     year: 'numeric'
   });
 
+  // Dynamic color assignments
+  const badgeColor = isBrutalist 
+    ? '#000' 
+    : (isPresent ? (isDark ? '#34D399' : '#059669') : (isDark ? '#F87171' : '#DC2626'));
+  
+  const badgeBg = isBrutalist 
+    ? (isPresent ? '#06D6A0' : '#EF476F') 
+    : (isPresent ? (isDark ? 'rgba(52, 211, 153, 0.12)' : 'rgba(16, 185, 129, 0.08)') : (isDark ? 'rgba(248, 113, 113, 0.12)' : 'rgba(239, 68, 68, 0.08)'));
+  
+  const badgeBorder = isBrutalist 
+    ? colors.border 
+    : (isPresent ? (isDark ? 'rgba(52, 211, 153, 0.25)' : 'rgba(16, 185, 129, 0.15)') : (isDark ? 'rgba(248, 113, 113, 0.25)' : 'rgba(239, 68, 68, 0.15)'));
+
   return (
-    <View style={[itemStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View style={[
+      itemStyles.card, 
+      { 
+        backgroundColor: colors.card, 
+        borderColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)',
+        shadowOpacity: isDark ? 0.25 : 0.03
+      }, 
+      isBrutalist && itemStyles.brutalistCard,
+      isBrutalist && { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.border }
+    ]}>
       <View style={itemStyles.leftContent}>
-        <Text style={[itemStyles.dateText, { color: colors.subText }]}>{formattedDate}</Text>
+        <Text style={[itemStyles.dateText, { color: colors.subText }, isBrutalist && itemStyles.brutalistSubText]}>{formattedDate}</Text>
         {item.topicCovered && (
-          <Text style={[itemStyles.topicText, { color: colors.text }]} numberOfLines={2}>
+          <Text style={[itemStyles.topicText, { color: colors.text }, isBrutalist && itemStyles.brutalistText]} numberOfLines={2}>
             {item.topicCovered}
           </Text>
         )}
       </View>
-      <View style={[itemStyles.statusBadge, { backgroundColor: isPresent ? '#27ae60' : '#c0392b' }]}>
-        <Icon name={isPresent ? "checkmark-circle-outline" : "close-circle-outline"} size={18} color="white" />
-        <Text style={itemStyles.statusText}>{item.attendance}</Text>
+      <View style={[
+        itemStyles.statusBadge, 
+        { 
+          backgroundColor: badgeBg,
+          borderColor: badgeBorder,
+          borderWidth: 1.5
+        },
+        isBrutalist && itemStyles.brutalistBadge
+      ]}>
+        <Icon 
+          name={isPresent ? "checkmark-circle-outline" : "close-circle-outline"} 
+          size={15} 
+          color={badgeColor} 
+          style={{ marginRight: 6 }}
+        />
+        <Text style={[
+          itemStyles.statusText, 
+          { color: badgeColor },
+          isBrutalist && { fontWeight: '900' }
+        ]}>
+          {item.attendance}
+        </Text>
       </View>
     </View>
   );
 };
 
-// ✅ --- NEW: Skeleton Loader Component ---
+// --- Skeleton Loader Component ---
 const SkeletonLectureItem = () => {
   const { colors, isDark } = useTheme();
   const shimmerColors = isDark ? ['#333', '#444', '#333'] : ['#ebebeb', '#c5c5c5', '#ebebeb'];
@@ -51,7 +92,7 @@ const SkeletonLectureItem = () => {
     <View style={[itemStyles.card, { borderColor: 'transparent', backgroundColor: colors.card }]}>
       <View style={itemStyles.leftContent}>
         <ShimmerPlaceholder shimmerColors={shimmerColors} style={{ width: 120, height: 16, borderRadius: 4 }} />
-        <ShimmerPlaceholder shimmerColors={shimmerColors} style={{ width: '90%', height: 20, borderRadius: 4, marginTop: 8 }} />
+        <ShimmerPlaceholder shimmerColors={shimmerColors} style={{ width: '95%', height: 20, borderRadius: 4, marginTop: 8 }} />
       </View>
       <ShimmerPlaceholder shimmerColors={shimmerColors} style={{ width: 95, height: 32, borderRadius: 20 }} />
     </View>
@@ -64,13 +105,6 @@ const SkeletonLoader = () => (
   </View>
 );
 
-
-// ... imports
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { TextInput, TouchableOpacity, Alert } from 'react-native';
-
-// ... existing code ...
-
 // --- Main Screen Component ---
 function CourseDetailsScreen(): React.JSX.Element {
   const route = useRoute<any>();
@@ -80,7 +114,6 @@ function CourseDetailsScreen(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ New State for Target Attendance
   const [targetAttendance, setTargetAttendance] = useState<string>('75');
   const [isEditingTarget, setIsEditingTarget] = useState(false);
 
@@ -124,9 +157,8 @@ function CourseDetailsScreen(): React.JSX.Element {
     }
   };
 
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, isBrutalist } = useTheme();
 
-  // ✅ Modified to show the skeleton loader
   const renderContent = () => {
     if (loading) {
       return <SkeletonLoader />;
@@ -149,19 +181,41 @@ function CourseDetailsScreen(): React.JSX.Element {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[
+      styles.container, 
+      { backgroundColor: colors.background }, 
+      isBrutalist && styles.brutalistContainer,
+      isBrutalist && { backgroundColor: colors.background }
+    ]}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       <LinearGradient
-        colors={isDark ? [colors.background, colors.background] : ['#e7f2f8', '#f4f6f8']}
+        colors={isDark ? [colors.background, colors.background] : ['#EFF6FF', '#F9FAFB']}
         style={styles.backgroundGradient}
       >
-        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>{courseName}</Text>
+        <View style={[
+          styles.header, 
+          { 
+            backgroundColor: colors.card, 
+            borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)',
+            shadowOpacity: isDark ? 0.15 : 0.02
+          }, 
+          isBrutalist && styles.brutalistHeader,
+          isBrutalist && { borderColor: colors.border }
+        ]}>
+          <Text style={[styles.title, { color: colors.text }, isBrutalist && styles.brutalistTitle]} numberOfLines={2}>{courseName}</Text>
 
           {/* ✅ Target Attendance UI */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, backgroundColor: isDark ? '#333' : '#f0f0f0', padding: 8, borderRadius: 8, alignSelf: 'flex-start' }}>
-            <Icon name="alarm-outline" size={20} color={colors.primary} style={{ marginRight: 8 }} />
-            <Text style={{ color: colors.text, marginRight: 8 }}>Target:</Text>
+          <View style={[
+            styles.targetWidget,
+            { 
+              backgroundColor: isDark ? 'rgba(59, 130, 246, 0.12)' : 'rgba(37, 99, 235, 0.05)',
+              borderColor: isDark ? 'rgba(59, 130, 246, 0.25)' : 'rgba(37, 99, 235, 0.1)'
+            },
+            isBrutalist && styles.brutalistTargetBadge,
+            isBrutalist && { backgroundColor: colors.card, borderColor: colors.border }
+          ]}>
+            <Icon name="alarm-outline" size={18} color={colors.primary} style={{ marginRight: 8 }} />
+            <Text style={{ color: colors.text, marginRight: 8, fontWeight: '600' }}>Target:</Text>
             {isEditingTarget ? (
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <TextInput
@@ -172,10 +226,12 @@ function CourseDetailsScreen(): React.JSX.Element {
                     backgroundColor: isDark ? '#444' : 'white',
                     color: colors.text,
                     padding: 4,
-                    borderRadius: 4,
-                    width: 40,
+                    borderRadius: 6,
+                    width: 42,
                     textAlign: 'center',
-                    marginRight: 8
+                    marginRight: 8,
+                    fontWeight: 'bold',
+                    fontSize: 14
                   }}
                   maxLength={3}
                 />
@@ -186,7 +242,7 @@ function CourseDetailsScreen(): React.JSX.Element {
             ) : (
               <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => setIsEditingTarget(true)}>
                 <Text style={{ color: colors.primary, fontWeight: 'bold', fontSize: 16, marginRight: 8 }}>{targetAttendance}%</Text>
-                <Icon name="pencil" size={16} color={colors.subText} />
+                <Icon name="pencil" size={14} color={colors.subText} />
               </TouchableOpacity>
             )}
           </View>
@@ -202,21 +258,34 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f6f8' },
   backgroundGradient: { flex: 1 },
   header: {
-    paddingVertical: 25,
-    paddingHorizontal: 20,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
     borderBottomWidth: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-    marginBottom: 10,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 4,
+    marginBottom: 16,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
   title: {
-    fontSize: 26,
-    fontWeight: 'bold',
+    fontSize: 25,
+    fontWeight: '800',
     color: '#2c3e50',
     lineHeight: 32,
+    letterSpacing: -0.5,
+  },
+  targetWidget: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 100,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
   },
   errorText: {
     textAlign: 'center',
@@ -233,10 +302,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   listContentContainer: {
-    paddingHorizontal: 15,
-    paddingBottom: 20,
-    paddingTop: 5, // Add some top padding for the skeleton
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+    paddingTop: 8,
   },
+  
+  // --- NEO-BRUTALISM OVERRIDES FOR SCREEN ---
+  brutalistContainer: {},
+  brutalistHeader: { backgroundColor: '#FFD166', borderBottomWidth: 4, borderRadius: 0, shadowOpacity: 0, elevation: 0, shadowRadius: 0 },
+  brutalistTitle: { fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' },
+  brutalistTargetBadge: { borderRadius: 0, borderWidth: 3 }
 });
 
 const itemStyles = StyleSheet.create({
@@ -245,31 +320,42 @@ const itemStyles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: 'white',
-    borderRadius: 15,
-    paddingVertical: 15,
+    borderRadius: 24,
+    paddingVertical: 18,
     paddingHorizontal: 20,
-    marginBottom: 10,
-    shadowColor: '#95a5a6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 2,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
   },
   leftContent: { flex: 1, marginRight: 15 },
-  dateText: { fontSize: 15, color: '#7f8c8d', fontWeight: 'bold' },
-  topicText: { fontSize: 17, color: '#2c3e50', marginTop: 5, lineHeight: 22 },
+  dateText: { fontSize: 13, color: '#7f8c8d', fontWeight: '600' },
+  topicText: { fontSize: 17, color: '#2c3e50', marginTop: 6, lineHeight: 22, fontWeight: '700', letterSpacing: -0.3 },
   statusBadge: {
-    borderRadius: 20,
+    borderRadius: 100,
     paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    minWidth: 90,
     justifyContent: 'center',
   },
-  statusText: { color: 'white', fontSize: 13, fontWeight: 'bold', marginLeft: 5, textTransform: 'uppercase' },
+  statusText: { fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5 },
+
+  // --- NEO-BRUTALISM OVERRIDES FOR ITEMS ---
+  brutalistCard: { 
+    borderRadius: 0, 
+    borderWidth: 4, 
+    shadowOffset: { width: 6, height: 6 }, 
+    shadowOpacity: 1, 
+    shadowRadius: 0,
+    elevation: 0,
+    marginBottom: 16,
+  },
+  brutalistText: { fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase' },
+  brutalistSubText: { fontWeight: '900', textTransform: 'uppercase' },
+  brutalistBadge: { borderRadius: 0, borderWidth: 3 }
 });
 
 export default CourseDetailsScreen;

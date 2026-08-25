@@ -110,24 +110,44 @@ const SkeletonCard = () => {
 
 // --- Class Card ---
 const ClassCard = ({ item }: { item: TimetableEvent }) => {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, isBrutalist } = useTheme();
   const startTime = formatTime(parseCustomDate(item.start));
   const endTime = formatTime(parseCustomDate(item.end));
   return (
     <View style={itemStyles.card}>
       <View style={itemStyles.timelineContainer}>
-        <View style={[itemStyles.iconContainer, { backgroundColor: isDark ? '#1e3a8a' : '#dbeafe' }]}>
-          <Icon name="book-outline" size={20} color={isDark ? '#60a5fa' : '#2563eb'} />
+        <View style={[
+          itemStyles.iconContainer,
+          { backgroundColor: isDark ? '#1e3a8a' : '#dbeafe' },
+          isBrutalist && itemStyles.brutalistIconContainer,
+          isBrutalist && { backgroundColor: colors.card, borderColor: colors.border }
+        ]}>
+          <Icon name="book-outline" size={20} color={isBrutalist ? colors.text : (isDark ? '#60a5fa' : '#2563eb')} />
         </View>
-        <View style={[itemStyles.timelineLine, { backgroundColor: colors.border }]} />
+        <View style={[
+          itemStyles.timelineLine,
+          { backgroundColor: isBrutalist ? colors.border : colors.border },
+          isBrutalist && itemStyles.brutalistTimelineLine,
+          isBrutalist && { backgroundColor: colors.border }
+        ]} />
       </View>
-      <View style={[itemStyles.detailsContainer, { backgroundColor: colors.card }]}>
-        <Text style={[itemStyles.timeText, { color: colors.primary }]}>{startTime} - {endTime}</Text>
-        <Text style={[itemStyles.courseName, { color: colors.text }]}>{item.courseName}</Text>
-        <Text style={[itemStyles.facultyName, { color: colors.subText }]}>{item.facultyName}</Text>
-        <View style={[itemStyles.footerContainer, { borderTopColor: colors.border }]}>
-          <Icon name="location-outline" size={16} color={colors.subText} />
-          <Text style={[itemStyles.footerText, { color: colors.subText }]}>{item.classRoom || 'N/A'}</Text>
+      <View style={[
+        itemStyles.detailsContainer,
+        { backgroundColor: colors.card },
+        isBrutalist && itemStyles.brutalistDetailsContainer,
+        isBrutalist && { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.border }
+      ]}>
+        <Text style={[itemStyles.timeText, { color: colors.primary }, isBrutalist && itemStyles.brutalistText]}>{startTime} - {endTime}</Text>
+        <Text style={[itemStyles.courseName, { color: colors.text }, isBrutalist && itemStyles.brutalistText]}>{item.courseName}</Text>
+        <Text style={[itemStyles.facultyName, { color: colors.subText }, isBrutalist && itemStyles.brutalistSubText]}>{item.facultyName}</Text>
+        <View style={[
+          itemStyles.footerContainer,
+          { borderTopColor: isBrutalist ? colors.border : colors.border },
+          isBrutalist && itemStyles.brutalistFooterContainer,
+          isBrutalist && { borderTopColor: colors.border }
+        ]}>
+          <Icon name="location-outline" size={16} color={isBrutalist ? colors.text : colors.subText} />
+          <Text style={[itemStyles.footerText, { color: colors.subText }, isBrutalist && itemStyles.brutalistSubText]}>{item.classRoom || 'N/A'}</Text>
         </View>
       </View>
     </View>
@@ -271,7 +291,7 @@ function TimetableScreen(): React.JSX.Element {
     }
   }, [selectedDateKey, allEvents]);
 
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, isBrutalist } = useTheme();
 
   if (loading) {
     return (
@@ -289,10 +309,15 @@ function TimetableScreen(): React.JSX.Element {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[
+      styles.container,
+      { backgroundColor: colors.background },
+      isBrutalist && styles.brutalistContainer,
+      isBrutalist && { backgroundColor: colors.background }
+    ]}>
       <View style={styles.headerContainer}>
-        <Text style={[styles.mainTitle, { color: colors.text }]}>Schedule</Text>
-        <Text style={[styles.dateSubtitle, { color: colors.subText }]}>{formatSectionHeaderDate(selectedDateKey)}</Text>
+        <Text style={[styles.mainTitle, { color: colors.text }, isBrutalist && styles.brutalistMainTitle]}>Schedule</Text>
+        <Text style={[styles.dateSubtitle, { color: colors.subText }, isBrutalist && styles.brutalistDateSubtitle]}>{formatSectionHeaderDate(selectedDateKey)}</Text>
       </View>
 
       <View style={styles.calendarContainer}>
@@ -313,12 +338,24 @@ function TimetableScreen(): React.JSX.Element {
                 style={[
                   styles.dateItem,
                   { backgroundColor: isSelected ? colors.primary : colors.card },
-                  isSelected && styles.dateItemSelected
+                  isSelected && styles.dateItemSelected,
+                  isBrutalist && styles.brutalistDateItem,
+                  isBrutalist && { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.border },
+                  isBrutalist && isSelected && styles.brutalistDateItemSelected,
+                  isBrutalist && isSelected && { backgroundColor: colors.primary, borderColor: colors.border }
                 ]}
               >
-                <Text style={[styles.dayText, { color: isSelected ? 'white' : colors.subText }]}>{getDayName(item)}</Text>
-                <Text style={[styles.dateNumText, { color: isSelected ? 'white' : colors.text }]}>{getDayNumber(item)}</Text>
-                {isSelected && <View style={styles.activeDot} />}
+                <Text style={[
+                  styles.dayText,
+                  { color: isSelected ? (isBrutalist ? '#000' : 'white') : colors.subText },
+                  isBrutalist && styles.brutalistDayText
+                ]}>{getDayName(item)}</Text>
+                <Text style={[
+                  styles.dateNumText,
+                  { color: isSelected ? (isBrutalist ? '#000' : 'white') : colors.text },
+                  isBrutalist && styles.brutalistDateNumText
+                ]}>{getDayNumber(item)}</Text>
+                {isSelected && <View style={[styles.activeDot, isBrutalist && { backgroundColor: colors.border }]} />}
               </TouchableOpacity>
             );
           }}
@@ -349,25 +386,25 @@ function TimetableScreen(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f6f8' },
 
-  headerContainer: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 5 },
-  mainTitle: { fontSize: 30, fontWeight: 'bold', color: '#2c3e50' },
-  dateSubtitle: { fontSize: 16, color: '#7f8c8d', fontWeight: '500', marginTop: 2 },
+  headerContainer: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 10 },
+  mainTitle: { fontSize: 32, fontWeight: '700', color: '#2c3e50', letterSpacing: -0.5 },
+  dateSubtitle: { fontSize: 16, color: '#7f8c8d', fontWeight: '500', marginTop: 4 },
 
   // Calendar Styles
-  calendarContainer: { marginVertical: 15, height: 75 },
+  calendarContainer: { marginVertical: 20, height: 80 },
   dateItem: {
-    width: 60,
-    height: 70,
-    borderRadius: 16,
+    width: 65,
+    height: 75,
+    borderRadius: 20,
     backgroundColor: 'white',
-    marginRight: 10,
+    marginRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 2,
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 8,
   },
   dateItemSelected: {
     backgroundColor: '#2563eb', // Active Blue
@@ -388,20 +425,38 @@ const styles = StyleSheet.create({
 
   sectionHeader: { fontSize: 18, fontWeight: '600', paddingVertical: 12, color: '#7f8c8d', backgroundColor: '#f4f6f8' },
   listContentContainer: { paddingHorizontal: 20, paddingBottom: 20, flexGrow: 1 },
+
+  // --- NEO-BRUTALISM OVERRIDES FOR SCREEN ---
+  brutalistContainer: {},
+  brutalistMainTitle: { fontWeight: '900', letterSpacing: 1.5, textTransform: 'uppercase' },
+  brutalistDateSubtitle: { fontWeight: '900', textTransform: 'uppercase' },
+  brutalistDateItem: {
+    borderRadius: 0,
+    borderWidth: 4,
+    shadowOffset: { width: 6, height: 6 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 0,
+  },
+  brutalistDateItemSelected: {
+    transform: [{ scale: 1.05 }],
+  },
+  brutalistDayText: { fontWeight: 'bold' },
+  brutalistDateNumText: { fontWeight: '900' },
 });
 
 const itemStyles = StyleSheet.create({
-  card: { flexDirection: 'row', alignItems: 'stretch', marginBottom: 2 },
+  card: { flexDirection: 'row', alignItems: 'stretch', marginBottom: 6 },
   timelineContainer: { alignItems: 'center', marginRight: 15 },
-  iconContainer: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', zIndex: 1, backgroundColor: 'white' },
+  iconContainer: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', zIndex: 1, backgroundColor: 'white' },
   timelineLine: { flex: 1, width: 2, backgroundColor: '#e0e0e0', marginTop: -10, marginBottom: -10 },
-  detailsContainer: { flex: 1, backgroundColor: 'white', borderRadius: 12, padding: 15, elevation: 2, shadowColor: '#95a5a6', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, marginBottom: 15 },
+  detailsContainer: { flex: 1, backgroundColor: 'white', borderRadius: 24, padding: 20, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 12, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.8)' },
 
-  timeText: { fontSize: 14, color: '#2980b9', fontWeight: '600', marginBottom: 6 },
-  courseName: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50', marginBottom: 4 },
-  facultyName: { fontSize: 15, color: '#7f8c8d' },
-  footerContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
-  footerText: { marginLeft: 6, fontSize: 14, color: '#7f8c8d' },
+  timeText: { fontSize: 14, color: '#2980b9', fontWeight: '700', marginBottom: 8 },
+  courseName: { fontSize: 20, fontWeight: '700', color: '#2c3e50', marginBottom: 6, letterSpacing: -0.3 },
+  facultyName: { fontSize: 16, color: '#7f8c8d' },
+  footerContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#f0f0f0' },
+  footerText: { marginLeft: 6, fontSize: 15, color: '#7f8c8d', fontWeight: '500' },
 
   // 🔥 NEW STYLES FOR HOLIDAY CARD 🔥
   holidayGradientCard: {
@@ -439,6 +494,28 @@ const itemStyles = StyleSheet.create({
     opacity: 0.9,
     fontWeight: '500'
   },
+
+  // --- NEO-BRUTALISM OVERRIDES FOR ITEMS ---
+  brutalistDetailsContainer: {
+    borderRadius: 0,
+    borderWidth: 4,
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 0,
+  },
+  brutalistText: { fontWeight: '900', textTransform: 'uppercase' },
+  brutalistSubText: { fontWeight: 'bold' },
+  brutalistIconContainer: {
+    borderRadius: 0,
+    borderWidth: 3,
+  },
+  brutalistTimelineLine: {
+    width: 4,
+  },
+  brutalistFooterContainer: {
+    borderTopWidth: 3,
+  }
 });
 
 export default TimetableScreen;

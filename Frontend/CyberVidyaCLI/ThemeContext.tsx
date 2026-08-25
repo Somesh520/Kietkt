@@ -4,50 +4,130 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // 🎨 Define Color Palettes
 const lightColors = {
-    background: '#f4f6f8',
-    card: '#ffffff',
-    text: '#2c3e50',
-    subText: '#7f8c8d',
-    primary: '#2980b9',
-    border: '#eee',
-    success: '#27ae60',
-    warning: '#f39c12',
-    danger: '#c0392b',
-    headerBg: '#fff',
-    tabBar: '#ffffff',
-    gradientWait: ['#e7f2f8', '#f4f6f8', '#f4f6f8']
+    background: '#F9FAFB', // Extremely light gray, cleaner than before
+    card: '#FFFFFF',
+    text: '#111827',
+    subText: '#6B7280',
+    primary: '#4f46e5', // Cohesive Indigo
+    border: '#E5E7EB',
+    success: '#10B981',
+    warning: '#F59E0B',
+    danger: '#EF4444',
+    headerBg: '#FFFFFF',
+    tabBar: '#FFFFFF',
+    gradientWait: ['#F3F4F6', '#F9FAFB', '#FFFFFF']
 };
 
 const darkColors = {
-    background: '#121212',
-    card: '#1e1e1e',
-    text: '#ecf0f1',
-    subText: '#b0b3b8',
-    primary: '#3498db',
-    border: '#333',
-    success: '#2ecc71',
-    warning: '#f1c40f',
-    danger: '#e74c3c',
-    headerBg: '#1e1e1e',
-    tabBar: '#1e1e1e',
-    gradientWait: ['#1e1e1e', '#121212', '#121212']
+    background: '#0F172A', // Slate 900 for deeper, richer dark mode
+    card: '#1E293B',       // Slate 800
+    text: '#F8FAFC',       // Slate 50
+    subText: '#94A3B8',    // Slate 400
+    primary: '#6366f1',    // Light Indigo for Dark Mode
+    border: '#334155',     // Slate 700
+    success: '#10B981',
+    warning: '#FBBF24',
+    danger: '#EF4444',
+    headerBg: '#1E293B',
+    tabBar: '#1E293B',
+    gradientWait: ['#1E293B', '#0F172A', '#0F172A']
+};
+
+// 🔥 Ultra-Vivid Neo-Brutalism Palette (Light)
+const brutalistLightColors = {
+    background: '#FFFFFF',
+    card: '#FFFFFF',
+    text: '#000000',
+    subText: '#000000',
+    primary: '#FFD166', // Retro Yellow as main accent
+    border: '#000000',
+    success: '#06D6A0', // Bright Mint
+    warning: '#FFD166',
+    danger: '#EF476F',  // Hot Pink
+    headerBg: '#118AB2', // Cyan header
+    tabBar: '#FFFFFF',
+    gradientWait: ['#FFFFFF', '#FFFFFF', '#FFFFFF']
+};
+
+// 🌑 Ultra-Vivid Neo-Brutalism Palette (Dark)
+const brutalistDarkColors = {
+    background: '#000000',
+    card: '#000000',
+    text: '#FFFFFF',
+    subText: '#FFFFFF',
+    primary: '#FFD166', // Keep bright accents for stark contrast
+    border: '#FFFFFF',
+    success: '#06D6A0', 
+    warning: '#FFD166',
+    danger: '#EF476F',  
+    headerBg: '#118AB2', 
+    tabBar: '#000000',
+    gradientWait: ['#000000', '#000000', '#000000']
 };
 
 type ThemeType = typeof lightColors;
 
+// 📝 Typography & Spacing Tokens
+const typography = {
+    normal: {
+        h1: { fontSize: 32, fontWeight: '700' as const, letterSpacing: -0.5 },
+        h2: { fontSize: 24, fontWeight: '600' as const, letterSpacing: -0.3 },
+        body: { fontSize: 16, fontWeight: '400' as const },
+        caption: { fontSize: 13, fontWeight: '500' as const, color: '#6B7280' }
+    },
+    brutalist: {
+        h1: { fontSize: 36, fontWeight: '900' as const, letterSpacing: 1, textTransform: 'uppercase' as const },
+        h2: { fontSize: 26, fontWeight: '900' as const, letterSpacing: 1, textTransform: 'uppercase' as const },
+        body: { fontSize: 16, fontWeight: 'bold' as const },
+        caption: { fontSize: 14, fontWeight: '900' as const, textTransform: 'uppercase' as const }
+    }
+};
+
+const spacing = {
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32
+};
+
+export type TypographyStyle = {
+    fontSize: number;
+    fontWeight: "normal" | "bold" | "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900";
+    letterSpacing?: number;
+    textTransform?: "none" | "capitalize" | "uppercase" | "lowercase";
+    color?: string;
+};
+
+export type TypographyConfig = {
+    h1: TypographyStyle;
+    h2: TypographyStyle;
+    body: TypographyStyle;
+    caption: TypographyStyle;
+};
+
 const ThemeContext = createContext<{
     isDark: boolean;
+    isBrutalist: boolean;
     colors: ThemeType;
+    typography: TypographyConfig;
+    spacing: typeof spacing;
     toggleTheme: () => void;
+    toggleBrutalist: () => void;
 }>({
     isDark: false,
+    isBrutalist: false,
     colors: lightColors,
+    typography: typography.normal,
+    spacing: spacing,
     toggleTheme: () => { },
+    toggleBrutalist: () => { },
 });
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     const systemScheme = useColorScheme();
     const [isDark, setIsDark] = useState(systemScheme === 'dark');
+    const [isBrutalist, setIsBrutalist] = useState(false);
 
     // Load saved theme on mount
     useEffect(() => {
@@ -58,6 +138,11 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
                     setIsDark(savedTheme === 'dark');
                 } else {
                     setIsDark(systemScheme === 'dark');
+                }
+
+                const savedBrutalist = await AsyncStorage.getItem('isBrutalist');
+                if (savedBrutalist !== null) {
+                    setIsBrutalist(savedBrutalist === 'true');
                 }
             } catch (e) {
                 console.log('Failed to load theme:', e);
@@ -93,10 +178,21 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    const colors = isDark ? darkColors : lightColors;
+    const toggleBrutalist = async () => {
+        const newMode = !isBrutalist;
+        setIsBrutalist(newMode);
+        try {
+            await AsyncStorage.setItem('isBrutalist', newMode ? 'true' : 'false');
+        } catch (e) {
+            console.log('Failed to save brutalist mode:', e);
+        }
+    };
+
+    const colors = isBrutalist ? (isDark ? brutalistDarkColors : brutalistLightColors) : (isDark ? darkColors : lightColors);
+    const activeTypography = isBrutalist ? typography.brutalist : typography.normal;
 
     return (
-        <ThemeContext.Provider value={{ isDark, colors, toggleTheme }}>
+        <ThemeContext.Provider value={{ isDark, isBrutalist, colors, typography: activeTypography, spacing, toggleTheme, toggleBrutalist }}>
             {children}
         </ThemeContext.Provider>
     );

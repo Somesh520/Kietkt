@@ -7,6 +7,7 @@ import {
   Dimensions,
   StatusBar,
 } from 'react-native';
+import { useTheme } from '../ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -15,6 +16,7 @@ interface SplashScreenProps {
 }
 
 const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
+  const { isBrutalist, isDark, colors } = useTheme();
   // Split the text into an array of characters
   const text = "Bunkbook";
   const letters = text.split('');
@@ -37,38 +39,38 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
     });
 
     Animated.sequence([
-      Animated.delay(300),
+      Animated.delay(100),
       
       // 1. Stagger the letters (one by one appearance)
-      Animated.stagger(100, animations),
+      Animated.stagger(40, animations),
 
       // 2. Expand the line under the text
       Animated.timing(lineScale, {
         toValue: 1,
-        duration: 600,
+        duration: 300,
         useNativeDriver: true,
       }),
 
       // 3. Show Tagline
       Animated.timing(contentOpacity, {
         toValue: 1,
-        duration: 800,
+        duration: 300,
         useNativeDriver: true,
       }),
 
-      Animated.delay(1200),
+      Animated.delay(500),
     ]).start(() => {
       onFinish();
     });
   }, []);
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+    <View style={[styles.container, { backgroundColor: isBrutalist ? (isDark ? '#000000' : '#FFD166') : colors.background }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor="transparent" translucent />
 
       {/* Subtle Background Pattern */}
-      <View style={styles.bgCircle1} />
-      <View style={styles.bgCircle2} />
+      {!isBrutalist && <View style={[styles.bgCircle1, isDark && { backgroundColor: '#1E293B' }]} />}
+      {!isBrutalist && <View style={[styles.bgCircle2, isDark && { backgroundColor: '#1E1B4B' }]} />}
 
       <View style={styles.centerContent}>
         
@@ -80,6 +82,9 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
                 key={index}
                 style={[
                   styles.letter,
+                  { color: isDark ? '#FFFFFF' : '#1E293B' },
+                  isBrutalist && styles.brutalistLetter,
+                  isBrutalist && { textShadowColor: isDark ? '#FFF' : '#000' },
                   {
                     opacity: animatedValues[index], // Fade in
                     transform: [
@@ -109,14 +114,24 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
         <Animated.View 
           style={[
             styles.underline, 
+            isBrutalist && styles.brutalistUnderline,
+            isBrutalist && { backgroundColor: isDark ? '#FFF' : '#000' },
             { transform: [{ scaleX: lineScale }] }
           ]} 
         />
 
         {/* --- TAGLINE --- */}
-        <Animated.View style={{ opacity: contentOpacity, marginTop: 20, alignItems: 'center' }}>
-          <View style={styles.taglinePill}>
-            <Text style={styles.tagline}>OFFICIAL MANAGER FOR UNOFFICIAL HOLIDAYS</Text>
+        <Animated.View style={{ opacity: contentOpacity, marginTop: 24, alignItems: 'center' }}>
+          <View style={[
+            styles.taglinePill,
+            isBrutalist && styles.brutalistTaglinePill,
+            isBrutalist && { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.border }
+          ]}>
+            <Text style={[
+              styles.tagline,
+              isBrutalist && styles.brutalistTagline,
+              isBrutalist && { color: colors.text }
+            ]}>OFFICIAL MANAGER FOR UNOFFICIAL HOLIDAYS</Text>
           </View>
         </Animated.View>
 
@@ -124,7 +139,11 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
 
       {/* Footer */}
       <Animated.View style={[styles.footer, { opacity: contentOpacity }]}>
-        <Text style={styles.footerText}>Made for Cybervidhya Students 🎓</Text>
+        <Text style={[
+          styles.footerText,
+          isBrutalist && styles.brutalistFooterText,
+          isBrutalist && { color: colors.text }
+        ]}>Made for CyberVidya Students 🎓</Text>
       </Animated.View>
 
     </View>
@@ -172,10 +191,10 @@ const styles = StyleSheet.create({
   },
   letter: {
     fontSize: 48,
-    fontWeight: '900', // Heavy Bold
-    color: '#1E293B', // Slate Dark
-    fontFamily: 'System', // Use default bold font
-    marginHorizontal: 1, // Slight spacing
+    fontWeight: '900',
+    color: '#1E293B',
+    fontFamily: 'System',
+    marginHorizontal: 1,
   },
   underline: {
     height: 4,
@@ -211,6 +230,33 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontWeight: '600',
   },
+
+  // --- NEO-BRUTALISM OVERRIDES ---
+  brutalistLetter: {
+    fontWeight: '900',
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    textShadowOffset: { width: 3, height: 3 },
+    textShadowRadius: 0,
+  },
+  brutalistUnderline: {
+    height: 8,
+    borderRadius: 0,
+  },
+  brutalistTaglinePill: {
+    borderRadius: 0,
+    borderWidth: 4,
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+  },
+  brutalistTagline: {
+    fontWeight: '900',
+  },
+  brutalistFooterText: {
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  }
 });
 
 export default SplashScreen;
