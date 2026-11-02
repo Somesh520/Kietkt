@@ -15,6 +15,7 @@ import {
   Modal,
   StatusBar,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -317,6 +318,19 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
   };
 
   const [todayAttendanceMap, setTodayAttendanceMap] = useState<{ [key: number]: string }>({});
+  const [githubStars, setGithubStars] = useState<number | null>(null);
+
+  // Fetch GitHub stars count
+  useEffect(() => {
+    fetch('https://api.github.com/repos/Somesh520/Kietkt')
+      .then(res => res.json())
+      .then(data => {
+        if (data && typeof data.stargazers_count === 'number') {
+          setGithubStars(data.stargazers_count);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Fetch profile photo
   const fetchProfilePhoto = async () => {
@@ -330,7 +344,12 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
           const response = await RNBlobUtil.fetch(
             'GET',
             profileInfo.profilePhoto,
-            { 'Authorization': token }
+            { 
+              'Authorization': token,
+              'Origin': 'https://kiet.cybervidya.net',
+              'Referer': 'https://kiet.cybervidya.net/',
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            }
           );
 
           const base64Data = await response.base64();
@@ -632,6 +651,40 @@ function HomeScreen({ onLogout }: { onLogout: () => void }): React.JSX.Element {
         </View>
       </TouchableOpacity>
 
+      {/* 🌟 Star the Project Card */}
+      <TouchableOpacity
+        onPress={() => Linking.openURL('https://github.com/Somesh520/Kietkt')}
+        style={[
+          styles.starCard,
+          { 
+            backgroundColor: isDark ? '#1F1B14' : '#FFFBEB',
+            borderColor: isDark ? '#78350F' : '#FDE68A'
+          },
+          isBrutalist ? styles.brutalistCard : undefined,
+          isBrutalist ? { backgroundColor: colors.card, borderColor: colors.border, shadowColor: colors.border } : undefined
+        ]}
+      >
+        <View style={styles.simulatorContent}>
+          <View style={[styles.starIconBox, { backgroundColor: isDark ? '#451A03' : '#FEF3C7' }]}>
+            <Icon name="star" size={22} color="#F59E0B" />
+          </View>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={[styles.starTitle, { color: colors.text }, isBrutalist ? styles.brutalistText : undefined]}>Star the Project</Text>
+              {githubStars !== null && (
+                <View style={[styles.starBadge, { backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : '#FEF3C7', borderColor: '#F59E0B' }]}>
+                  <Text style={[styles.starBadgeText, { color: isDark ? '#FBBF24' : '#D97706' }]}>⭐ {githubStars}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={[styles.starSubtitle, { color: colors.subText }, isBrutalist ? styles.brutalistSubText : undefined]}>
+              Support this project on GitHub
+            </Text>
+          </View>
+          <Icon name="logo-github" size={22} color={colors.text} style={{ marginLeft: 6 }} />
+        </View>
+      </TouchableOpacity>
+
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[styles.listHeader, { color: colors.text }]}>Overall Summary</Text>
         <View style={styles.summaryContainer}>
@@ -839,6 +892,44 @@ const styles = StyleSheet.create({
   simulatorContent: { flexDirection: 'row', alignItems: 'center' },
   simulatorTitle: { fontSize: 18, fontWeight: '700', marginBottom: 2 },
   simulatorSubtitle: { fontSize: 13, lineHeight: 18 },
+  starCard: {
+    borderRadius: 20,
+    marginBottom: 20,
+    padding: 14,
+    borderWidth: 1,
+    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowColor: '#000',
+  },
+  starIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  starTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  starSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  starBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginLeft: 8,
+  },
+  starBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
 });
 
 export default HomeScreen;

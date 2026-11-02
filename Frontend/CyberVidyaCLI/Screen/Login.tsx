@@ -25,6 +25,7 @@ import { getAnalytics, logEvent } from '@react-native-firebase/analytics';
 import { useTheme } from '../ThemeContext';
 import CryptoJS from 'crypto-js';
 import axios from 'axios';
+import { markLoginTime } from '../api';
 
 // --- API ENCRYPTION ---
 const keyB64 = "NPdLWA5w7yFQhPeUuKmO/A==";
@@ -85,21 +86,31 @@ const LoginPage = ({ onLoginSuccess }: LoginProps) => {
     if (finalToken.startsWith('"')) finalToken = JSON.parse(finalToken);
     if (!finalToken.includes('GlobalEducation')) finalToken = `GlobalEducation ${finalToken}`;
 
-    // Handle Remember Me
+    // ✅ FIX 1: Token ko pehle AsyncStorage mein save karo (await),
+    // taaki API calls fire hone se pehle token available ho (race condition fix)
     try {
-      if (rememberMe && !otpStep) {
+      await AsyncStorage.setItem('authToken', finalToken);
+      markLoginTime(); // Grace period shuru karo — fresh login ke 10s tak 403 ignore
+    } catch (e) {
+      console.log('Failed to save authToken', e);
+    }
+
+    // ✅ FIX 2: Remember Me — OTP flow ke baad bhi save karo (!otpStep condition hatayi)
+    try {
+      if (rememberMe) {
         await AsyncStorage.setItem('saved_username', username);
         await AsyncStorage.setItem('saved_password', password);
-      } else if (!rememberMe && !otpStep) {
+        console.log('✅ Credentials saved (Remember Me ON)');
+      } else {
         await AsyncStorage.removeItem('saved_username');
         await AsyncStorage.removeItem('saved_password');
+        console.log('🗑️ Credentials cleared (Remember Me OFF)');
       }
     } catch (e) {
       console.log('Failed to save credentials', e);
     }
 
     onLoginSuccess(finalToken);
-    AsyncStorage.setItem('authToken', finalToken).catch(() => {});
     logEvent(getAnalytics(), 'login_success', { method });
   };
 

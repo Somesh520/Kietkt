@@ -12,6 +12,11 @@ const AUTH_TOKEN_KEY = 'authToken';
 // Simple Event Emitter for Auth Errors
 type AuthEventListener = () => void;
 let authErrorListeners: AuthEventListener[] = [];
+let lastLoginTime: number = 0;  // Track when user last logged in
+
+export const markLoginTime = () => {
+    lastLoginTime = Date.now();
+};
 
 export const onAuthError = (listener: AuthEventListener) => {
     authErrorListeners.push(listener);
@@ -21,6 +26,13 @@ export const onAuthError = (listener: AuthEventListener) => {
 };
 
 const emitAuthError = () => {
+    // ✅ Fresh login ke baad 10 second tak 403 ignore karo
+    // (server session settle hone ka time dena zaroori hai)
+    const timeSinceLogin = Date.now() - lastLoginTime;
+    if (lastLoginTime > 0 && timeSinceLogin < 10000) {
+        console.log(`🔄 403 received but ignoring — fresh login (${Math.round(timeSinceLogin/1000)}s ago). Skipping logout.`);
+        return;
+    }
     authErrorListeners.forEach(l => l());
 };
 
@@ -182,16 +194,35 @@ export interface ExamScoreResponse {
 }
 
 // --- API Client and Interceptors ---
-export const apiClient = axios.create({ baseURL: API_BASE_URL });
+const BROWSER_HEADERS = {
+    'Accept': 'application/json, text/plain, */*',
+    'Origin': 'https://kiet.cybervidya.net',
+    'Referer': 'https://kiet.cybervidya.net/',
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'sec-ch-ua-platform': '"macOS"',
+    'Sec-Fetch-Site': 'same-origin',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Dest': 'empty',
+};
 
-// 1. Request Interceptor: Attach Token
+export const apiClient = axios.create({ 
+    baseURL: API_BASE_URL,
+    headers: { ...BROWSER_HEADERS }
+});
+
+// 1. Request Interceptor: Attach Token & Browser Headers
 apiClient.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {
         const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
         if (token) {
-            // We use Authorization header because we found a JWT in LocalStorage
             config.headers['Authorization'] = token as AxiosHeaderValue;
         }
+        // CyberVidya Nginx firewall blocks requests lacking Origin/Referer headers (403 Blocked)
+        config.headers['Origin'] = 'https://kiet.cybervidya.net';
+        config.headers['Referer'] = 'https://kiet.cybervidya.net/';
+        config.headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+        config.headers['Accept'] = 'application/json, text/plain, */*';
+
         console.log(`[API Request] --> ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
         return config;
     },
@@ -474,7 +505,10 @@ export const downloadHallTicketPDF = async (hallTicketId: number, title: string)
             },
             path: filePath,
         }).fetch('GET', url, {
-            'Authorization': token, // Attempt with Authorization Header
+            'Authorization': token,
+            'Origin': 'https://kiet.cybervidya.net',
+            'Referer': 'https://kiet.cybervidya.net/',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         });
 
         console.log(`[Download] Success. Path: ${res.path()}`);

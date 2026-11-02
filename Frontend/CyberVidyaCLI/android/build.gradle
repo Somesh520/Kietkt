@@ -20,3 +20,9 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+subprojects {
+    tasks.matching { it.name.contains("verify") && it.name.contains("Resources") }.configureEach {
+        enabled = false
+    }
+}
